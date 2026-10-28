@@ -223,11 +223,13 @@ import ActivityKit
 public struct SmartiumLockScreenBannerView: View {
     public let toolTitle: String
     public let state: SmartiumActivityAttributes.ContentState
+    public let isStale: Bool
     @Environment(\.colorScheme) private var colorScheme
 
-    public init(toolTitle: String, state: SmartiumActivityAttributes.ContentState) {
+    public init(toolTitle: String, state: SmartiumActivityAttributes.ContentState, isStale: Bool = false) {
         self.toolTitle = toolTitle
         self.state = state
+        self.isStale = isStale
     }
 
     private var isDark: Bool {
@@ -256,6 +258,7 @@ public struct SmartiumLockScreenBannerView: View {
                 displaySize: 52
             )
             .orbFrozenTime(frozenInstant)
+            .colorMultiply(state.animationEndsAt != nil && !isStale ? .purple : .white)
             .transaction { $0.animation = nil }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -320,7 +323,8 @@ public struct SmartiumLiveActivityWidget: Widget {
         ActivityConfiguration(for: SmartiumActivityAttributes.self) { context in
             SmartiumLockScreenBannerView(
                 toolTitle: context.attributes.toolTitle,
-                state: context.state
+                state: context.state,
+                isStale: context.isStale
             )
             .activitySystemActionForegroundColor(.purple)
         } dynamicIsland: { context in
@@ -339,6 +343,7 @@ public struct SmartiumLiveActivityWidget: Widget {
                             displaySize: 44
                         )
                         .orbFrozenTime(expandedInstant)
+                        .colorMultiply(context.state.animationEndsAt != nil && !context.isStale ? .purple : .white)
                         .transaction { $0.animation = nil }
                     }
                     .padding(.leading, 4)
@@ -389,6 +394,7 @@ public struct SmartiumLiveActivityWidget: Widget {
                     displaySize: 20
                 )
                 .orbFrozenTime(compactInstant)
+                .colorMultiply(context.state.animationEndsAt != nil && !context.isStale ? .purple : .white)
                 .transaction { $0.animation = nil }
             } compactTrailing: {
                 Text(orbState.label)
@@ -404,6 +410,7 @@ public struct SmartiumLiveActivityWidget: Widget {
                     displaySize: 18
                 )
                 .orbFrozenTime(compactInstant)
+                .colorMultiply(context.state.animationEndsAt != nil && !context.isStale ? .purple : .white)
                 .transaction { $0.animation = nil }
             }
             .keylineTint(.purple)
