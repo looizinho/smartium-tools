@@ -54,6 +54,7 @@ nonisolated public struct SmartiumOrbTimelineProvider: TimelineProvider {
 
 public struct SmartiumOrbWidgetEntryView: View {
     public let entry: SmartiumOrbTimelineEntry
+    @Environment(\.smartiumAppearance) private var appearance
     @Environment(\.widgetFamily) private var family
     @Environment(\.colorScheme) private var colorScheme
 
@@ -62,7 +63,7 @@ public struct SmartiumOrbWidgetEntryView: View {
     }
 
     private var isDark: Bool {
-        colorScheme == .dark
+        (appearance.colorScheme ?? colorScheme) == .dark
     }
 
     private var primaryTextColor: Color {
@@ -99,7 +100,7 @@ public struct SmartiumOrbWidgetEntryView: View {
                 }
                 RadialGradient(
                     colors: [
-                        Color.purple.opacity(isDark ? 0.28 : 0.16),
+                        appearance.accentColor.opacity(isDark ? 0.28 : 0.16),
                         Color.clear
                     ],
                     center: .topTrailing,
@@ -119,14 +120,14 @@ public struct SmartiumOrbWidgetEntryView: View {
                 Spacer()
                 Image(systemName: "sparkles")
                     .font(.caption2)
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(appearance.accentColor)
             }
 
             Button(intent: CycleOrbStateIntent()) {
                 ThinkingOrb(
                     state: entry.sharedState.orbState,
                     size: .px64,
-                    theme: .auto,
+                    theme: appearance.orbTheme,
                     displaySize: 68
                 )
                 .orbFrozenTime(frozenInstant)
@@ -146,14 +147,14 @@ public struct SmartiumOrbWidgetEntryView: View {
                 ThinkingOrb(
                     state: entry.sharedState.orbState,
                     size: .px64,
-                    theme: .auto,
+                    theme: appearance.orbTheme,
                     displaySize: 84
                 )
                 .orbFrozenTime(frozenInstant)
                 .padding(6)
                 .background(
                     Circle()
-                        .fill(isDark ? .white.opacity(0.05) : Color.purple.opacity(0.07))
+                        .fill(isDark ? .white.opacity(0.05) : appearance.accentColor.opacity(0.07))
                 )
             }
             .buttonStyle(.plain)
@@ -161,10 +162,10 @@ public struct SmartiumOrbWidgetEntryView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 4) {
                     Image(systemName: "sparkles")
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(appearance.accentColor)
                     Text(entry.sharedState.activeToolName)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(appearance.accentColor)
                 }
 
                 Text(entry.sharedState.orbState.label)
@@ -173,7 +174,7 @@ public struct SmartiumOrbWidgetEntryView: View {
 
                 if let progress = entry.sharedState.stepProgress {
                     ProgressView(value: progress)
-                        .tint(.purple)
+                        .tint(appearance.accentColor)
                 } else {
                     Text("Toque no orbe ou no botão para alternar o estado.")
                         .font(.caption2)
@@ -188,7 +189,7 @@ public struct SmartiumOrbWidgetEntryView: View {
                         .font(.caption2.weight(.semibold))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Capsule().fill(Color.purple.opacity(isDark ? 0.85 : 0.90)))
+                        .background(Capsule().fill(appearance.accentColor.opacity(isDark ? 0.85 : 0.90)))
                         .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
@@ -206,7 +207,11 @@ public struct SmartiumOrbWidget: Widget {
 
     public var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: SmartiumOrbTimelineProvider()) { entry in
+            let appearance = AppearanceSettings.load()
             SmartiumOrbWidgetEntryView(entry: entry)
+                .environment(\.smartiumAppearance, appearance)
+                .preferredColorScheme(appearance.colorScheme)
+                .tint(appearance.accentColor)
         }
         .configurationDisplayName("Smartium Orb")
         .description("Exibe e controla o estado atual das ferramentas do SmartiumTools.")
@@ -223,6 +228,7 @@ import ActivityKit
 public struct SmartiumLockScreenBannerView: View {
     public let toolTitle: String
     public let state: SmartiumActivityAttributes.ContentState
+    @Environment(\.smartiumAppearance) private var appearance
     public let isStale: Bool
     @Environment(\.colorScheme) private var colorScheme
 
@@ -233,7 +239,7 @@ public struct SmartiumLockScreenBannerView: View {
     }
 
     private var isDark: Bool {
-        colorScheme == .dark
+        (appearance.colorScheme ?? colorScheme) == .dark
     }
 
     private var primaryTextColor: Color {
@@ -254,18 +260,18 @@ public struct SmartiumLockScreenBannerView: View {
             ThinkingOrb(
                 state: state.orbState,
                 size: .px64,
-                theme: .auto,
+                theme: appearance.orbTheme,
                 displaySize: 52
             )
             .orbFrozenTime(frozenInstant)
-            .colorMultiply(state.animationEndsAt != nil && !isStale ? .purple : .white)
+            .colorMultiply(state.animationEndsAt != nil && !isStale ? appearance.accentColor : .white)
             .transaction { $0.animation = nil }
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
                         .font(.caption)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(appearance.accentColor)
                     Text(toolTitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(secondaryTextColor)
@@ -278,7 +284,7 @@ public struct SmartiumLockScreenBannerView: View {
 
                 if let progress = state.stepProgress {
                     ProgressView(value: progress)
-                        .tint(.purple)
+                        .tint(appearance.accentColor)
                 }
             }
 
@@ -289,7 +295,7 @@ public struct SmartiumLockScreenBannerView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                     .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color.purple))
+                    .background(Circle().fill(appearance.accentColor))
             }
             .buttonStyle(.plain)
         }
@@ -303,7 +309,7 @@ public struct SmartiumLockScreenBannerView: View {
                 }
                 RadialGradient(
                     colors: [
-                        Color.purple.opacity(isDark ? 0.24 : 0.14),
+                        appearance.accentColor.opacity(isDark ? 0.24 : 0.14),
                         Color.clear
                     ],
                     center: .topTrailing,
@@ -321,13 +327,17 @@ public struct SmartiumLiveActivityWidget: Widget {
 
     public var body: some WidgetConfiguration {
         ActivityConfiguration(for: SmartiumActivityAttributes.self) { context in
+            let appearance = context.state.appearance ?? AppearanceSettings.load()
             SmartiumLockScreenBannerView(
                 toolTitle: context.attributes.toolTitle,
                 state: context.state,
                 isStale: context.isStale
             )
-            .activitySystemActionForegroundColor(.purple)
+            .environment(\.smartiumAppearance, appearance)
+            .preferredColorScheme(appearance.colorScheme)
+            .activitySystemActionForegroundColor(appearance.accentColor)
         } dynamicIsland: { context in
+            let appearance = context.state.appearance ?? AppearanceSettings.load()
             let rawInstant = context.state.updatedAt.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600)
             let orbState = context.state.orbState
             let expandedInstant = rawInstant * resolvePreset(orbState, .px64).speed
@@ -343,7 +353,7 @@ public struct SmartiumLiveActivityWidget: Widget {
                             displaySize: 44
                         )
                         .orbFrozenTime(expandedInstant)
-                        .colorMultiply(context.state.animationEndsAt != nil && !context.isStale ? .purple : .white)
+                        .colorMultiply(context.state.animationEndsAt != nil && !context.isStale ? appearance.accentColor : .white)
                         .transaction { $0.animation = nil }
                     }
                     .padding(.leading, 4)
@@ -353,7 +363,7 @@ public struct SmartiumLiveActivityWidget: Widget {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(context.attributes.toolTitle)
                             .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.purple)
+                            .foregroundStyle(appearance.accentColor)
                         Text(context.state.statusText)
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
@@ -369,7 +379,7 @@ public struct SmartiumLiveActivityWidget: Widget {
                                 .font(.caption.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 6)
-                                .background(Capsule().fill(Color.purple.opacity(0.85)))
+                                .background(Capsule().fill(appearance.accentColor.opacity(0.85)))
                                 .foregroundStyle(.white)
                         }
                         .buttonStyle(.plain)
@@ -394,12 +404,12 @@ public struct SmartiumLiveActivityWidget: Widget {
                     displaySize: 20
                 )
                 .orbFrozenTime(compactInstant)
-                .colorMultiply(context.state.animationEndsAt != nil && !context.isStale ? .purple : .white)
+                .colorMultiply(context.state.animationEndsAt != nil && !context.isStale ? appearance.accentColor : .white)
                 .transaction { $0.animation = nil }
             } compactTrailing: {
                 Text(orbState.label)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(appearance.accentColor)
                     .lineLimit(1)
                     .contentTransition(.numericText())
             } minimal: {
@@ -410,10 +420,10 @@ public struct SmartiumLiveActivityWidget: Widget {
                     displaySize: 18
                 )
                 .orbFrozenTime(compactInstant)
-                .colorMultiply(context.state.animationEndsAt != nil && !context.isStale ? .purple : .white)
+                .colorMultiply(context.state.animationEndsAt != nil && !context.isStale ? appearance.accentColor : .white)
                 .transaction { $0.animation = nil }
             }
-            .keylineTint(.purple)
+            .keylineTint(appearance.accentColor)
         }
     }
 }

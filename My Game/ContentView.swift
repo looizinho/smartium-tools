@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.smartiumAppearance) private var appearance
     #if os(macOS)
     @State private var selectedTab = 0
     @Namespace private var tabAnimation
@@ -15,7 +16,7 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("Smartium\(Text("Tools").foregroundStyle(.purple))")
+            Text("Smartium\(Text("Tools").foregroundStyle(appearance.accentColor))")
                 .font(.title.bold())
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal)
@@ -39,10 +40,10 @@ struct ContentView: View {
                     .padding(4)
                     .background(
                         Capsule()
-                            .fill(.purple.opacity(0.1))
+                            .fill(appearance.accentColor.opacity(0.1))
                             .overlay(
                                 Capsule()
-                                    .strokeBorder(.purple.opacity(0.25), lineWidth: 1)
+                                    .strokeBorder(appearance.accentColor.opacity(0.25), lineWidth: 1)
                             )
                     )
                 }
@@ -61,7 +62,7 @@ struct ContentView: View {
                     Image(systemName: "waveform.circle")
                 }
             }
-            .tint(.purple)
+            .tint(appearance.accentColor)
             #endif
         }
     }
@@ -79,13 +80,13 @@ struct ContentView: View {
                 Text(title)
             }
             .font(.subheadline.weight(isSelected ? .semibold : .regular))
-            .foregroundStyle(isSelected ? .white : .purple)
+            .foregroundStyle(isSelected ? .white : appearance.accentColor)
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
             .background {
                 if isSelected {
                     Capsule()
-                        .fill(Color.purple)
+                        .fill(appearance.accentColor)
                         .matchedGeometryEffect(id: "selectedTabPill", in: tabAnimation)
                 }
             }
@@ -97,6 +98,7 @@ struct ContentView: View {
 }
 
 struct ThinkingOrbsView: View {
+    @Environment(\.smartiumAppearance) private var appearance
     @Environment(\.scenePhase) private var scenePhase
     @State private var currentState: OrbState = ToolSharedState.load().orbState
     #if canImport(ActivityKit) && os(iOS)
@@ -158,9 +160,9 @@ struct ThinkingOrbsView: View {
                     .padding(.vertical, 8)
                     .background(
                         Capsule()
-                            .fill(liveActivityManager.isRunning ? Color.red.opacity(0.15) : Color.purple.opacity(0.15))
+                            .fill(liveActivityManager.isRunning ? Color.red.opacity(0.15) : appearance.accentColor.opacity(0.15))
                     )
-                    .foregroundStyle(liveActivityManager.isRunning ? .red : .purple)
+                    .foregroundStyle(liveActivityManager.isRunning ? .red : appearance.accentColor)
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 2)

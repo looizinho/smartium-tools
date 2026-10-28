@@ -7,6 +7,45 @@ import Foundation
 import OSLog
 
 enum ICloudSettings {
+    nonisolated private struct Document: Decodable {
+        let appearance: AppearanceSettings?
+    }
+
+    nonisolated static func loadAppearance() async -> AppearanceSettings? {
+        await Task.detached(priority: .utility) {
+            let manager = FileManager.default
+            guard let container = manager.url(forUbiquityContainerIdentifier: "iCloud.dev.smartium.tests") else {
+                return nil
+            }
+            let url = container.appendingPathComponent("Documents/settings.json")
+            // Download on demand when the file exists only in iCloud.
+            if manager.isUbiquitousItem(at: url) {
+                try? manager.startDownloadingUbiquitousItem(at: url)
+            }
+            for attempt in 0..<3 {
+                var coordinationError: NSError?
+                var result: AppearanceSettings?
+                var readError: Error?
+                NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readableURL in
+                    do {
+                        let data = try Data(contentsOf: readableURL)
+                        result = data.isEmpty ? AppearanceSettings() : try JSONDecoder().decode(Document.self, from: data).appearance ?? AppearanceSettings()
+                    } catch {
+                        readError = error
+                    }
+                }
+                if let result { return result }
+                if attempt == 2, let error = coordinationError ?? readError {
+                    Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
+                        .error("Falha ao ler aparência: \(error.localizedDescription, privacy: .public)")
+                } else {
+                    try? await Task.sleep(for: .seconds(1))
+                }
+            }
+            return nil
+        }.value
+    }
+
     nonisolated static func prepareTestFile() async {
         // Container lookup and coordinated disk access must run off the main thread.
         await Task.detached(priority: .utility) {

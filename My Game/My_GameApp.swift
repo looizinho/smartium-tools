@@ -6,14 +6,30 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 @main
 struct My_GameApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var appearance = AppearanceSettings.load()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .task {
+                .environment(\.smartiumAppearance, appearance)
+                .preferredColorScheme(appearance.colorScheme)
+                .tint(appearance.accentColor)
+                .task(id: scenePhase) {
+                    guard scenePhase == .active else { return }
                     await ICloudSettings.prepareTestFile()
+                    guard let loaded = await ICloudSettings.loadAppearance(), !Task.isCancelled,
+                          loaded != appearance else { return }
+                    appearance = loaded
+                    loaded.save()
+                    WidgetCenter.shared.reloadAllTimelines()
+                    #if canImport(ActivityKit) && os(iOS)
+                    await LiveActivityManager.shared.refreshAppearance()
+                    #endif
                 }
         }
     }

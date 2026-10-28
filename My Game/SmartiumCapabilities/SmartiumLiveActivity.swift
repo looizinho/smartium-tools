@@ -22,19 +22,22 @@ nonisolated public struct SmartiumActivityAttributes: ActivityAttributes, Sendab
         public var updatedAt: Date
         /// Absolute deadline for the latest activation or orb state change.
         public var animationEndsAt: Date?
+        public var appearance: AppearanceSettings?
 
         public init(
             orbStateRaw: String = "working",
             statusText: String = "Working…",
             stepProgress: Double? = nil,
             updatedAt: Date = .now,
-            animationEndsAt: Date? = nil
+            animationEndsAt: Date? = nil,
+            appearance: AppearanceSettings? = nil
         ) {
             self.orbStateRaw = orbStateRaw
             self.statusText = statusText
             self.stepProgress = stepProgress
             self.updatedAt = updatedAt
             self.animationEndsAt = animationEndsAt
+            self.appearance = appearance
         }
 
         /// A new state starts a fresh five-second window; progress-only updates do not.
@@ -165,7 +168,8 @@ public final class LiveActivityManager {
             statusText: initialState.label,
             stepProgress: progress,
             updatedAt: .now,
-            animationEndsAt: Date.now.addingTimeInterval(5)
+            animationEndsAt: Date.now.addingTimeInterval(5),
+            appearance: .load()
         )
 
         do {
@@ -209,9 +213,19 @@ public final class LiveActivityManager {
             updatedState.changeOrbState(to: newOrbState.rawValue, at: .now)
             updatedState.statusText = sharedState.statusMessage
             updatedState.stepProgress = sharedState.stepProgress
+            updatedState.appearance = .load()
             await activity.update(ActivityContent(state: updatedState, staleDate: updatedState.animationEndsAt))
         }
         reconcileAnimation()
+    }
+
+    /// Ask WidgetKit to render the newly cached appearance without restarting animation.
+    public func refreshAppearance() async {
+        for activity in activeActivities {
+            var state = activity.content.state
+            state.appearance = .load()
+            await activity.update(ActivityContent(state: state, staleDate: state.animationEndsAt))
+        }
     }
 
     /// Ends all active SmartiumTools Live Activities immediately.
