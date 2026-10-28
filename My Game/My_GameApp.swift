@@ -12,6 +12,9 @@ struct My_GameApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    await ICloudSettings.prepareTestFile()
+                }
         }
     }
 }

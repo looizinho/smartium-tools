@@ -6,138 +6,240 @@
 //
 
 import SwiftUI
-import RealityKit
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct ContentView: View {
-    let boxEntity = Entity()
+    #if os(macOS)
+    @State private var selectedTab = 0
+    @Namespace private var tabAnimation
+    #endif
 
     var body: some View {
-        ZStack {
-            RealityView { content in
-                // If iOS device that is not the simulator,
-                // use the spatial tracking camera.
-                #if os(iOS) && !targetEnvironment(simulator)
-                content.camera = .spatialTracking
-                #endif
-                createGameScene(content)
-            }
-            #if !os(tvOS)
-            .gesture(tapEntityGesture)
-            #endif
-            // When this app runs on macOS or iOS simulator,
-            // add camera controls that orbit the origin.
-            #if os(macOS) || (os(iOS) && targetEnvironment(simulator))
-            .realityViewCameraControls(.orbit)
-            #endif
+        VStack(spacing: 0) {
+            Text("Smartium\(Text("Tools").foregroundStyle(.purple))")
+                .font(.title.bold())
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal)
+                .padding(.vertical, 12)
 
-            // Add instructions to tap the cube.
-            VStack {
-                Spacer()
-                #if os(tvOS)
-                Button(action: {
-                    try? spinEntity(boxEntity)
-                }, label: {
-                    Text("Select to spin the cube!")
-                })
-                #else
-                Text("Tap the cube to spin!")
-                #endif
-            }.padding()
+            #if os(macOS)
+            Group {
+                if selectedTab == 0 {
+                    ThinkingOrbsView()
+                } else {
+                    VoiceRingView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 4) {
+                        macOSTabButton(title: "Thinking orbs", systemImage: "sparkles", index: 0)
+                        macOSTabButton(title: "Voice ring", systemImage: "waveform.circle", index: 1)
+                    }
+                    .padding(4)
+                    .background(
+                        Capsule()
+                            .fill(.purple.opacity(0.1))
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(.purple.opacity(0.25), lineWidth: 1)
+                            )
+                    )
+                }
+            }
+            #else
+            TabView {
+                Tab {
+                    ThinkingOrbsView()
+                } label: {
+                    Image(systemName: "sparkles")
+                }
+
+                Tab {
+                    VoiceRingView()
+                } label: {
+                    Image(systemName: "waveform.circle")
+                }
+            }
+            .tint(.purple)
+            #endif
         }
     }
 
-    /// A gesture that spins entities that have a spin component.
-    #if !os(tvOS)
-    var tapEntityGesture: some Gesture {
-        TapGesture().targetedToEntity(where: .has(SpinComponent.self))
-            .onEnded({ gesture in
-                try? spinEntity(gesture.entity)
-            })
+    #if os(macOS)
+    private func macOSTabButton(title: String, systemImage: String, index: Int) -> some View {
+        let isSelected = selectedTab == index
+        return Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                selectedTab = index
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                Text(title)
+            }
+            .font(.subheadline.weight(isSelected ? .semibold : .regular))
+            .foregroundStyle(isSelected ? .white : .purple)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background {
+                if isSelected {
+                    Capsule()
+                        .fill(Color.purple)
+                        .matchedGeometryEffect(id: "selectedTabPill", in: tabAnimation)
+                }
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
     #endif
+}
 
-    /// Creates a game scene and adds it to the view content.
-    ///
-    /// - Parameter content: The active content for this RealityKit game.
-    fileprivate func createGameScene(_ content: any RealityViewContentProtocol) {
-        let boxSize: SIMD3<Float> = [0.2, 0.2, 0.2]
-        // A component that shows a red box model.
-        var material = PhysicallyBasedMaterial()
-        material.baseColor = .init(tint: .init(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0))
-        let boxModel = ModelComponent(
-            mesh: .generateBox(size: boxSize),
-            materials: [material]
-        )
-        // Components that allow interaction and visual feedback.
-        let inputTargetComponent = InputTargetComponent()
-        #if !os(tvOS)
-        let hoverComponent = HoverEffectComponent()
-        #endif
+struct ThinkingOrbsView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var currentState: OrbState = ToolSharedState.load().orbState
+    #if canImport(ActivityKit) && os(iOS)
+    private var liveActivityManager = LiveActivityManager.shared
+    @State private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    #endif
 
-        // A component that sets the collision shape.
-        let boxCollision = CollisionComponent(shapes: [.generateBox(size: boxSize)])
+    var body: some View {
+        ZStack {
+            // Centered ThinkingOrb from Libraries.dev (ThinkingOrbsKit).
+            ThinkingOrb(
+                state: currentState,
+                size: .px64,
+                displaySize: 160
+            )
+            .contentShape(Rectangle())
+            #if !os(tvOS)
+            .onTapGesture {
+                advanceState()
+            }
+            #endif
 
-        // A component that stores spin information.
-        let spinComponent = SpinComponent()
+            // Instructions, current state indicator, and Dynamic Island quick toggle at the bottom.
+            VStack(spacing: 10) {
+                Spacer()
+                Text(currentState.label)
+                    .font(.headline)
+                #if os(tvOS)
+                Button(action: {
+                    advanceState()
+                }, label: {
+                    Text("Select to change the orb state!")
+                })
+                #else
+                Text("Tap the orb to change state!")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                #endif
 
-        // Set all the entity's components.
-        #if os(tvOS)
-        boxEntity.components.set([
-            boxModel, boxCollision, inputTargetComponent,
-            spinComponent
-        ])
-        #else
-        boxEntity.components.set([
-            boxModel, boxCollision, inputTargetComponent, hoverComponent,
-            spinComponent
-        ])
-        #endif
+                #if canImport(ActivityKit) && os(iOS)
+                Button {
+                    Task {
+                        liveActivityManager.syncActiveActivity()
+                        let wasRunning = liveActivityManager.isRunning
+                        await liveActivityManager.toggle(
+                            toolTitle: "SmartiumTools",
+                            state: currentState
+                        )
+                        if !wasRunning && liveActivityManager.isRunning {
+                            beginLiveActivityBackgroundTask()
+                        } else if !liveActivityManager.isRunning {
+                            endLiveActivityBackgroundTask()
+                        }
+                    }
+                } label: {
+                    Label(
+                        liveActivityManager.isRunning ? "Encerrar Ilha Dinâmica" : "Ativar na Ilha Dinâmica",
+                        systemImage: liveActivityManager.isRunning ? "xmark.circle.fill" : "capsule.portrait.tophalf.filled"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(liveActivityManager.isRunning ? Color.red.opacity(0.15) : Color.purple.opacity(0.15))
+                    )
+                    .foregroundStyle(liveActivityManager.isRunning ? .red : .purple)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
+                #endif
+            }
+            .padding()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            currentState = ToolSharedState.load().orbState
+            #if canImport(ActivityKit) && os(iOS)
+            liveActivityManager.syncActiveActivity()
+            #endif
+        }
+        .task {
+            for await _ in NotificationCenter.default.notifications(named: .smartiumOrbStateDidChange) {
+                currentState = ToolSharedState.load().orbState
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                currentState = ToolSharedState.load().orbState
+                #if canImport(ActivityKit) && os(iOS)
+                liveActivityManager.syncActiveActivity()
+                endLiveActivityBackgroundTask()
+                #endif
+            } else if newPhase == .background {
+                #if canImport(ActivityKit) && os(iOS)
+                if liveActivityManager.isRunning {
+                    beginLiveActivityBackgroundTask()
+                }
+                #endif
+            }
+        }
+    }
 
-        // Add the entity to the RealityView content.
-        content.add(boxEntity)
+    /// Advances the ThinkingOrb to the next available state and syncs Widgets + Dynamic Island.
+    private func advanceState() {
+        let allStates = OrbState.allCases
+        guard let index = allStates.firstIndex(of: currentState) else { return }
+        let nextIndex = (index + 1) % allStates.count
+        let nextState = allStates[nextIndex]
+        currentState = nextState
 
-        // If iOS device, except simulator.
-        #if os(iOS) && !targetEnvironment(simulator)
-        // Create an anchor target that is any floor surface
-        // greater than or equal to a 1x1m area.
-        let anchorTarget: AnchoringComponent.Target = .plane(
-            .horizontal, classification: .floor,
-            minimumBounds: .one
-        )
-        boxEntity.components.set(AnchoringComponent(anchorTarget))
-        // Move boxEntity up by half the box height, so that its base is on the ground.
-        boxEntity.position.y += boxSize.y / 2
-        #elseif os(macOS) || os(iOS) || os(tvOS)
-        // If macOS, tvOS, or iOS simulator, add a perspective camera to the scene.
-        let camera = Entity(components: PerspectiveCameraComponent())
-        content.add(camera)
+        ToolSharedState.updateOrbState(nextState)
 
-        // Set the camera position and orientation.
-        let cameraLocation: SIMD3<Float> = [1, 1, 2]
-        camera.look(at: .zero, from: cameraLocation, relativeTo: nil)
+        #if canImport(ActivityKit) && os(iOS)
+        Task {
+            await liveActivityManager.update(state: nextState)
+        }
         #endif
     }
 
-    /// Spins an entity around the y-axis.
-    /// - Parameter entity: The entity to spin.
-    func spinEntity(_ entity: Entity) throws {
-        // Get the entity's spin component.
-        guard let spinComponent = entity.components[SpinComponent.self]
-        else { return }
+    #if canImport(ActivityKit) && os(iOS)
+    private func beginLiveActivityBackgroundTask() {
+        guard backgroundTaskID == .invalid else { return }
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "SmartiumLiveActivityAnimation") {
+            endLiveActivityBackgroundTask()
+        }
+    }
 
-        // Create a spin action that makes one revolution
-        // around the axis from the component.
-        let spinAction = SpinAction(revolutions: 1, localAxis: spinComponent.spinAxis)
+    private func endLiveActivityBackgroundTask() {
+        guard backgroundTaskID != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTaskID)
+        backgroundTaskID = .invalid
+    }
+    #endif
+}
 
-        // Create a one second animation that spins an entity.
-        let spinAnimation = try AnimationResource.makeActionAnimation(
-            for: spinAction,
-            duration: 1,
-            bindTarget: .transform
-        )
-
-        // Play the animation that spins the entity.
-        entity.playAnimation(spinAnimation)
+struct VoiceRingView: View {
+    var body: some View {
+        Color.clear
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
