@@ -6,9 +6,6 @@
 //
 
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
 
 struct ContentView: View {
     #if os(macOS)
@@ -104,7 +101,8 @@ struct ThinkingOrbsView: View {
     @State private var currentState: OrbState = ToolSharedState.load().orbState
     #if canImport(ActivityKit) && os(iOS)
     private var liveActivityManager = LiveActivityManager.shared
-    @State private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    @State private var liveActivityError: String?
+    @State private var isChangingLiveActivity = false
     #endif
 
     var body: some View {
@@ -141,18 +139,14 @@ struct ThinkingOrbsView: View {
 
                 #if canImport(ActivityKit) && os(iOS)
                 Button {
+                    isChangingLiveActivity = true
                     Task {
-                        liveActivityManager.syncActiveActivity()
-                        let wasRunning = liveActivityManager.isRunning
+                        defer { isChangingLiveActivity = false }
                         await liveActivityManager.toggle(
                             toolTitle: "SmartiumTools",
                             state: currentState
                         )
-                        if !wasRunning && liveActivityManager.isRunning {
-                            beginLiveActivityBackgroundTask()
-                        } else if !liveActivityManager.isRunning {
-                            endLiveActivityBackgroundTask()
-                        }
+                        liveActivityError = liveActivityManager.lastErrorMessage
                     }
                 } label: {
                     Label(
@@ -170,6 +164,11 @@ struct ThinkingOrbsView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 2)
+                .disabled(isChangingLiveActivity)
+                .alert("Atividade ao Vivo", item: $liveActivityError) { _ in
+                } message: { error in
+                    Text(error)
+                }
                 #endif
             }
             .padding()
@@ -191,13 +190,6 @@ struct ThinkingOrbsView: View {
                 currentState = ToolSharedState.load().orbState
                 #if canImport(ActivityKit) && os(iOS)
                 liveActivityManager.syncActiveActivity()
-                endLiveActivityBackgroundTask()
-                #endif
-            } else if newPhase == .background {
-                #if canImport(ActivityKit) && os(iOS)
-                if liveActivityManager.isRunning {
-                    beginLiveActivityBackgroundTask()
-                }
                 #endif
             }
         }
@@ -219,21 +211,6 @@ struct ThinkingOrbsView: View {
         }
         #endif
     }
-
-    #if canImport(ActivityKit) && os(iOS)
-    private func beginLiveActivityBackgroundTask() {
-        guard backgroundTaskID == .invalid else { return }
-        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "SmartiumLiveActivityAnimation") {
-            endLiveActivityBackgroundTask()
-        }
-    }
-
-    private func endLiveActivityBackgroundTask() {
-        guard backgroundTaskID != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(backgroundTaskID)
-        backgroundTaskID = .invalid
-    }
-    #endif
 }
 
 struct VoiceRingView: View {

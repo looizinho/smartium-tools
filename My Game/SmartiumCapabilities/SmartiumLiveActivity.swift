@@ -51,7 +51,8 @@ extension SmartiumActivityAttributes.ContentState {
 }
 
 /// Reusable manager for starting, updating, and ending Dynamic Island Live Activities
-/// from any future SmartiumTools capability.
+/// from any future SmartiumTools capability. Content updates are event-driven;
+/// Live Activities keep their last snapshot while the app is suspended.
 @MainActor
 @Observable
 public final class LiveActivityManager {
@@ -60,7 +61,6 @@ public final class LiveActivityManager {
     public private(set) var currentActivity: Activity<SmartiumActivityAttributes>?
     public private(set) var lastErrorMessage: String?
 
-    private var animationTask: Task<Void, Never>?
     private var activityMonitorTask: Task<Void, Never>?
 
     public var isRunning: Bool {
@@ -80,9 +80,6 @@ public final class LiveActivityManager {
     private init() {
         syncActiveActivity()
         observeActivities()
-        if isRunning {
-            startAnimationLoop()
-        }
     }
 
     /// Synchronizes `currentActivity` with ActivityKit's live list of active sessions.
@@ -96,15 +93,11 @@ public final class LiveActivityManager {
             for await activity in Activity<SmartiumActivityAttributes>.activityUpdates {
                 guard let self else { return }
                 self.syncActiveActivity()
-                self.startAnimationLoop()
                 Task { [weak self] in
                     for await state in activity.activityStateUpdates {
                         guard let self else { return }
                         if state == .ended || state == .dismissed {
                             self.syncActiveActivity()
-                            if !self.isRunning {
-                                self.stopAnimationLoop()
-                            }
                         }
                     }
                 }
@@ -124,7 +117,6 @@ public final class LiveActivityManager {
         syncActiveActivity()
         if !activeActivities.isEmpty {
             await update(state: initialState, statusText: initialState.label, progress: progress)
-            startAnimationLoop()
             return
         }
 
@@ -148,7 +140,6 @@ public final class LiveActivityManager {
                 pushType: nil
             )
             currentActivity = activity
-            startAnimationLoop()
         } catch {
             lastErrorMessage = error.localizedDescription
         }
@@ -160,30 +151,37 @@ public final class LiveActivityManager {
         statusText: String? = nil,
         progress: Double? = nil
     ) async {
+        // Persist first so app, widgets, and the activity share the same content,
+        // including updates received when there is no active Live Activity.
+        var sharedState = ToolSharedState.load()
+        sharedState.orbState = newOrbState
+        sharedState.statusMessage = statusText ?? newOrbState.label
+        sharedState.stepProgress = progress
+        sharedState.save()
+        NotificationCenter.default.post(name: .smartiumOrbStateDidChange, object: newOrbState)
+
         let activities = activeActivities
         guard !activities.isEmpty else {
             currentActivity = nil
-            stopAnimationLoop()
             return
         }
         currentActivity = activities.first
 
         let updatedState = SmartiumActivityAttributes.ContentState(
             orbStateRaw: newOrbState.rawValue,
-            statusText: statusText ?? newOrbState.label,
-            stepProgress: progress,
-            updatedAt: .now
+            statusText: sharedState.statusMessage,
+            stepProgress: sharedState.stepProgress,
+            updatedAt: sharedState.updatedAt
         )
         let content = ActivityContent(state: updatedState, staleDate: nil)
         for activity in activities {
             await activity.update(content)
         }
-        startAnimationLoop()
     }
 
     /// Ends all active SmartiumTools Live Activities immediately.
     public func stop() async {
-        stopAnimationLoop()
+        lastErrorMessage = nil
         for activity in Activity<SmartiumActivityAttributes>.activities {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
@@ -198,44 +196,6 @@ public final class LiveActivityManager {
         } else {
             await start(toolTitle: toolTitle, initialState: state)
         }
-    }
-
-    /// Periodically advances `updatedAt` on active Live Activities so the ThinkingOrb
-    /// geometry evolves in the Dynamic Island and Lock Screen banner.
-    private func startAnimationLoop() {
-        guard animationTask == nil else { return }
-        animationTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(350))
-                guard !Task.isCancelled, let self else { break }
-                let activities = self.activeActivities
-                guard !activities.isEmpty else {
-                    self.currentActivity = nil
-                    break
-                }
-                let shared = ToolSharedState.load()
-                let orbState = shared.orbState
-                let nextContentState = SmartiumActivityAttributes.ContentState(
-                    orbStateRaw: orbState.rawValue,
-                    statusText: orbState.label,
-                    stepProgress: shared.stepProgress,
-                    updatedAt: .now
-                )
-                let content = ActivityContent(state: nextContentState, staleDate: nil)
-                for activity in activities {
-                    await activity.update(content)
-                }
-            }
-            // A canceled loop must not clear the handle of a replacement task.
-            if !Task.isCancelled {
-                self?.animationTask = nil
-            }
-        }
-    }
-
-    private func stopAnimationLoop() {
-        animationTask?.cancel()
-        animationTask = nil
     }
 }
 
