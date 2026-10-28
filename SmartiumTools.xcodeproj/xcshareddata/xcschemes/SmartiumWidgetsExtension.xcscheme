@@ -18,7 +18,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "0EB379C030915EC9001AEB6E"
                BuildableName = "SmartiumWidgetsExtension.appex"
-               ReferencedContainer = "container:My Game.xcodeproj">
+               ReferencedContainer = "container:SmartiumTools.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -30,8 +30,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "0EB6B688309115940044AE2C"
-               BuildableName = "My Game.app"
-               ReferencedContainer = "container:My Game.xcodeproj">
+               BuildableName = "SmartiumTools.app"
+               ReferencedContainer = "container:SmartiumTools.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -61,8 +61,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "0EB6B688309115940044AE2C"
-            BuildableName = "My Game.app"
-            ReferencedContainer = "container:My Game.xcodeproj">
+            BuildableName = "SmartiumTools.app"
+            ReferencedContainer = "container:SmartiumTools.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <EnvironmentVariables>
@@ -96,8 +96,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "0EB6B688309115940044AE2C"
-            BuildableName = "My Game.app"
-            ReferencedContainer = "container:My Game.xcodeproj">
+            BuildableName = "SmartiumTools.app"
+            ReferencedContainer = "container:SmartiumTools.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

@@ -1,6 +1,6 @@
 //
 //  SmartiumSharedState.swift
-//  My Game
+//  SmartiumTools
 //
 //  Shared state & AppIntents foundation for SmartiumTools Widgets and Dynamic Island.
 //

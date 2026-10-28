@@ -23,9 +23,9 @@
     { "path": "SmartiumWidgetsExtension.entitlements" },
     {
       "kind": "folder",
-      "path": "My Game",
+      "path": "SmartiumTools",
       "target-membership": [
-        "My Game",
+        "SmartiumTools",
         "SmartiumWidgetsExtension",
       ],
       "membership-exceptions": [
@@ -35,7 +35,7 @@
             "Assets.xcassets",
             "ContentView.swift",
             "ICloudSettings.swift",
-            "My_GameApp.swift",
+            "SmartiumToolsApp.swift",
             "SpinComponent.swift",
           ],
         },
@@ -65,16 +65,16 @@
       "kind": "group",
       "name": "Products",
       "children": [
-        { "path": "<PRODUCTS>/My Game.app", "id": "0EB6B689309115940044AE2C", "type": "wrapper.application", "index": false },
-        { "path": "<PRODUCTS>/SmartiumWidgetsExtension.appex", "id": "0EB379C130915EC9001AEB6E", "type": "wrapper.app-extension", "index": false, "target-membership": [ { "build-phase": "My Game/copy/Embed Foundation Extensions", "header-preservation": "remove-on-copy" } ] },
+        { "path": "<PRODUCTS>/SmartiumTools.app", "id": "0EB6B689309115940044AE2C", "type": "wrapper.application", "index": false },
+        { "path": "<PRODUCTS>/SmartiumWidgetsExtension.appex", "id": "0EB379C130915EC9001AEB6E", "type": "wrapper.app-extension", "index": false, "target-membership": [ { "build-phase": "SmartiumTools/copy/Embed Foundation Extensions", "header-preservation": "remove-on-copy" } ] },
       ],
     },
   ],
   "targets": [
     {
-      "name": "My Game",
+      "name": "SmartiumTools",
       "id": "0EB6B688309115940044AE2C",
-      "product": "Products/My Game.app",
+      "product": "Products/SmartiumTools.app",
       "product-type": "application",
       "dependencies": [
         "SmartiumWidgetsExtension",
@@ -119,7 +119,7 @@
       "build-settings": {
         "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
         "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
-        "CODE_SIGN_ENTITLEMENTS": "My Game/My Game.entitlements",
+        "CODE_SIGN_ENTITLEMENTS": "SmartiumTools/SmartiumTools.entitlements",
         "CODE_SIGN_STYLE": "Automatic",
         "CURRENT_PROJECT_VERSION": "2",
         "DEVELOPMENT_TEAM": "PBJKH22479",
@@ -148,7 +148,7 @@
         "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "@executable_path/../Frameworks",
         "MACOSX_DEPLOYMENT_TARGET": "27.2",
         "MARKETING_VERSION": "1.0",
-        "PRODUCT_BUNDLE_IDENTIFIER": "dev.smartium.tests.My-Game",
+        "PRODUCT_BUNDLE_IDENTIFIER": "dev.smartium.tests.SmartiumTools",
         "PRODUCT_NAME": "$(TARGET_NAME)",
         "REGISTER_APP_GROUPS": "YES",
         "SDKROOT": "auto",
@@ -201,7 +201,7 @@
         ],
         "MACOSX_DEPLOYMENT_TARGET": "27.2",
         "MARKETING_VERSION": "1.0",
-        "PRODUCT_BUNDLE_IDENTIFIER": "dev.smartium.tests.My-Game.SmartiumWidgets",
+        "PRODUCT_BUNDLE_IDENTIFIER": "dev.smartium.tests.SmartiumTools.SmartiumWidgets",
         "PRODUCT_NAME": "$(TARGET_NAME)",
         "REGISTER_APP_GROUPS": "YES",
         "SDKROOT": "auto",

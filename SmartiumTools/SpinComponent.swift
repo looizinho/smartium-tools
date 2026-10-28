@@ -1,6 +1,6 @@
 //
 //  SpinComponent.swift
-//  My Game
+//  SmartiumTools
 //
 //  Created by Luiz Neto on 27/10/26.
 //

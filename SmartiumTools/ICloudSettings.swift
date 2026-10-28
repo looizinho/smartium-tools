@@ -1,6 +1,6 @@
 //
 //  ICloudSettings.swift
-//  My Game
+//  SmartiumTools
 //
 
 import Foundation

@@ -1,6 +1,6 @@
 //
-//  My_GameApp.swift
-//  My Game
+//  SmartiumToolsApp.swift
+//  SmartiumTools
 //
 //  Created by Luiz Neto on 27/10/26.
 //
@@ -9,7 +9,7 @@ import SwiftUI
 import WidgetKit
 
 @main
-struct My_GameApp: App {
+struct SmartiumToolsApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var appearance = AppearanceSettings.load()
 

@@ -1,6 +1,6 @@
 //
 //  SmartiumWidgetViews.swift
-//  My Game
+//  SmartiumTools
 //
 //  Ready-to-use WidgetKit views, TimelineProvider, and Dynamic Island configurations
 //  for SmartiumTools Home Screen Widgets and Live Activities.

@@ -8,13 +8,13 @@ See `AGENTS.md` for style, commit, and PR conventions. This file covers what you
 
 ```sh
 # Build the app (also builds the embedded widget extension)
-xcodebuild -project "My Game.xcodeproj" -scheme "My Game" -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -project "SmartiumTools.xcodeproj" -scheme "SmartiumTools" -destination 'platform=iOS Simulator,name=iPhone 16' build
 
 # Build only the widget extension
-xcodebuild -project "My Game.xcodeproj" -scheme "SmartiumWidgetsExtension" -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -project "SmartiumTools.xcodeproj" -scheme "SmartiumWidgetsExtension" -destination 'platform=iOS Simulator,name=iPhone 16' build
 
 # macOS is a supported platform too
-xcodebuild -project "My Game.xcodeproj" -scheme "My Game" -destination 'platform=macOS' build
+xcodebuild -project "SmartiumTools.xcodeproj" -scheme "SmartiumTools" -destination 'platform=macOS' build
 
 # Tests (one class or one method)
 xcodebuild ... test -only-testing:"<TestTarget>/OrbGoldenTests"
@@ -25,14 +25,14 @@ xcodebuild ... test -only-testing:"<TestTarget>/OrbGoldenTests/<testMethod>"
 
 ## Project file format
 
-`My Game.xcodeproj/project.xcproj` is a **JSON-style project description**, not a classic `project.pbxproj`. Target membership is set per folder: a folder lists its targets in `target-membership`, and per-target `membership-exceptions` list the files a target leaves out. When you add a file, check whether it belongs in both targets:
+`SmartiumTools.xcodeproj/project.xcproj` is a **JSON-style project description**, not a classic `project.pbxproj`. Target membership is set per folder: a folder lists its targets in `target-membership`, and per-target `membership-exceptions` list the files a target leaves out. When you add a file, check whether it belongs in both targets:
 
-- Everything under `My Game/` compiles into **both** the app and `SmartiumWidgetsExtension`, except `ContentView.swift`, `My_GameApp.swift`, `SpinComponent.swift`, `Assets.xcassets`, and the entitlements. So `ThinkingOrbsKit/` and `SmartiumCapabilities/` are shared source, not a framework. A new file in `My Game/` ends up in the widget unless you add it to the exclusions.
+- Everything under `SmartiumTools/` compiles into **both** the app and `SmartiumWidgetsExtension`, except `ContentView.swift`, `SmartiumToolsApp.swift`, `SpinComponent.swift`, `Assets.xcassets`, and the entitlements. So `ThinkingOrbsKit/` and `SmartiumCapabilities/` are shared source, not a framework. A new file in `SmartiumTools/` ends up in the widget unless you add it to the exclusions.
 - `SmartiumWidgets/` belongs to the extension only.
 
 Both targets build with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and approachable concurrency. Types used from non-main contexts (for example `ToolSharedState`, `SmartiumActivityAttributes`) are marked `nonisolated` on purpose. Keep that in mind when you add model or engine types. Deployment targets are iOS/macOS 27.2.
 
-The app target also links the remote `Libraries.dev` package (products include a `ThinkingOrbsKit` with the same name, plus BorderBeam/Voice* kits). The app code doesn't `import ThinkingOrbsKit`; it uses the **local** `My Game/ThinkingOrbsKit/` sources, which are the only copy the widget extension can see. If you add `import ThinkingOrbsKit`, expect the package's types to clash with the local ones.
+The app target also links the remote `Libraries.dev` package (products include a `ThinkingOrbsKit` with the same name, plus BorderBeam/Voice* kits). The app code doesn't `import ThinkingOrbsKit`; it uses the **local** `SmartiumTools/ThinkingOrbsKit/` sources, which are the only copy the widget extension can see. If you add `import ThinkingOrbsKit`, expect the package's types to clash with the local ones.
 
 ## Architecture
 

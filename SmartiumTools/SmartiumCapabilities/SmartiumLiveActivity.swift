@@ -1,6 +1,6 @@
 //
 //  SmartiumLiveActivity.swift
-//  My Game
+//  SmartiumTools
 //
 //  ActivityKit attributes and LiveActivityManager for Dynamic Island support.
 //
