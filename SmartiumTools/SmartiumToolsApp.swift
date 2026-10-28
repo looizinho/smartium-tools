@@ -16,6 +16,9 @@ struct SmartiumToolsApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                #if os(macOS)
+                .toolbar(removing: .title)
+                #endif
                 .environment(\.smartiumAppearance, appearance)
                 .preferredColorScheme(appearance.colorScheme)
                 .tint(appearance.accentColor)
