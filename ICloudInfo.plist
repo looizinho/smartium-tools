@@ -4,6 +4,10 @@
 <dict>
     <key>NSAlarmKitUsageDescription</key>
     <string>O SmartiumTools agenda alarmes criados no app.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>O SmartiumTools usa a câmera para exibir a imagem da aba Staging.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>O SmartiumTools usa o microfone para recursos de áudio da aba Staging.</string>
     <key>NSUbiquitousContainers</key>
     <dict>
         <key>iCloud.dev.smartium.tests</key>

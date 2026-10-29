@@ -36,10 +36,11 @@ struct ContentView: View {
       .toolbar {
         ToolbarItem(placement: .principal) {
           HStack(spacing: 4) {
-            macOSTabButton(title: "Thinking orbs", systemImage: "sparkles", index: 0)
-            macOSTabButton(title: "Voice ring", systemImage: "waveform.circle", index: 1)
-            macOSTabButton(title: "Limitimer", systemImage: "timer", index: 2)
-          }
+          macOSTabButton(title: "Thinking orbs", systemImage: "sparkles", index: 0)
+          macOSTabButton(title: "Voice ring", systemImage: "waveform.circle", index: 1)
+          macOSTabButton(title: "Limitimer", systemImage: "timer", index: 2)
+          macOSTabButton(title: "Staging", systemImage: "laser.burst", index: 3)
+        }
           .padding(4)
           .background(
             Capsule()
@@ -69,6 +70,12 @@ struct ContentView: View {
           AlarmKitView()
         } label: {
           Image(systemName: "timer")
+        }
+
+        Tab {
+          StagingView()
+        } label: {
+          Image(systemName: "laser.burst")
         }
       }
       .tint(appearance.accentColor)
@@ -228,6 +235,26 @@ struct VoiceRingView: View {
   var body: some View {
     Color.clear
       .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+}
+
+struct StagingView: View {
+  var body: some View {
+    #if os(iOS)
+    StagingCameraView()
+    #else
+    VStack(spacing: 18) {
+      Image(systemName: "laser.burst")
+        .font(.system(size: 42, weight: .medium))
+        .padding(22)
+        .background(Circle().fill(.quinary))
+
+      Text("Câmera disponível no iOS.")
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    #endif
   }
 }
 

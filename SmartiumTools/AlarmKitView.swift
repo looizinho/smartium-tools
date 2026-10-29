@@ -8,6 +8,7 @@
 import SwiftUI
 
 #if canImport(AlarmKit) && os(iOS)
+import ActivityKit
 import AlarmKit
 import Observation
 #endif
@@ -70,6 +71,18 @@ private struct AlarmKitViewContent: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let remaining = manager.remainingSeconds(at: context.date) ?? selectedDuration
+
+                    Text(TimerFormat.duration(remaining))
+                        .font(.system(size: 52, weight: .light, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: remaining)
+                        .accessibilityLabel("Tempo restante")
+                }
+
                 Spacer()
 
                 Button {
@@ -114,7 +127,6 @@ private struct AlarmKitViewContent: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
-                    activeAlarmsSection
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 24)
@@ -156,30 +168,6 @@ private struct AlarmKitViewContent: View {
                 .frame(height: 54)
                 .allowsHitTesting(false)
         }
-    }
-
-    private var activeAlarmsSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(manager.alarms.isEmpty ? "Nenhum timer ativo" : "Ativos")
-                .font(.title2.bold())
-                .padding(.bottom, manager.alarms.isEmpty ? 4 : 8)
-
-            if manager.alarms.isEmpty {
-                Text("Inicie um timer para vê-lo aqui e na Ilha Dinâmica.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(manager.alarms) { alarm in
-                    AlarmKitAlarmRow(
-                        alarm: alarm,
-                        displayText: manager.displayText(for: alarm),
-                        action: { manager.toggle(alarm) },
-                        onCancel: { manager.cancel(alarm) }
-                    )
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func picker(
@@ -274,69 +262,16 @@ private struct IdentifiedAlarmError: Identifiable {
     let message: String
 }
 
-private struct AlarmKitAlarmRow: View {
-    let alarm: Alarm
-    let displayText: String
-    let action: () -> Void
-    let onCancel: () -> Void
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(displayText)
-                    .font(.system(size: 44, weight: .light, design: .rounded))
-                    .foregroundStyle(.primary)
-
-                Text(alarmStateDescription)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button(action: action) {
-                Image(systemName: actionIcon)
-                    .font(.title3.weight(.semibold))
-                    .frame(width: 54, height: 54)
-                    .background(Circle().fill(.quinary))
-            }
-        }
-        .padding(.vertical, 10)
-        .overlay(alignment: .bottom) {
-            Divider()
-        }
-        .contextMenu {
-            Button(role: .destructive, action: onCancel) {
-                Label("Cancelar", systemImage: "xmark")
-            }
-        }
-    }
-
-    private var alarmStateDescription: String {
-        switch alarm.state {
-        case .scheduled: return "Agendado"
-        case .countdown: return "Contando"
-        case .paused: return "Pausado"
-        case .alerting: return "Tocando"
-        @unknown default: return "Timer"
-        }
-    }
-
-    private var actionIcon: String {
-        switch alarm.state {
-        case .paused: return "play.fill"
-        case .alerting: return "stop.fill"
-        default: return "pause.fill"
-        }
-    }
-}
-
 @Observable
 private final class AlarmKitManager {
     private(set) var alarms: [Alarm] = []
+    private(set) var presentationStates: [AlarmPresentationState] = []
     private(set) var authorizationState: AlarmManager.AuthorizationState = .notDetermined
     private(set) var isWorking = false
     private(set) var lastErrorMessage: String?
+
+    private var presentationMonitorTask: Task<Void, Never>?
+    private var contentMonitorTasks: [String: Task<Void, Never>] = [:]
 
     func clearError() {
         lastErrorMessage = nil
@@ -344,9 +279,11 @@ private final class AlarmKitManager {
 
     func observeAlarms() async {
         refresh()
+        observePresentationStates()
 
         for await updatedAlarms in AlarmManager.shared.alarmUpdates {
             alarms = updatedAlarms
+            refreshPresentationStates()
         }
     }
 
@@ -430,27 +367,93 @@ private final class AlarmKitManager {
         } catch {
             alarms = []
         }
+
+        refreshPresentationStates()
+    }
+
+    private func refreshPresentationStates() {
+        presentationStates = Activity<AlarmAttributes<SmartiumAlarmMetadata>>
+            .activities
+            .compactMap { $0.content.state }
+    }
+
+    private func observePresentationStates() {
+        presentationMonitorTask?.cancel()
+        contentMonitorTasks.values.forEach { $0.cancel() }
+        contentMonitorTasks = [:]
+
+        presentationMonitorTask = Task { [weak self] in
+            for await activity in Activity<AlarmAttributes<SmartiumAlarmMetadata>>.activityUpdates {
+                self?.observeContentUpdates(for: activity)
+            }
+        }
+    }
+
+    private func observeContentUpdates(for activity: Activity<AlarmAttributes<SmartiumAlarmMetadata>>) {
+        contentMonitorTasks[activity.id]?.cancel()
+        contentMonitorTasks[activity.id] = Task { [weak self] in
+            for await _ in activity.contentUpdates {
+                self?.refreshPresentationStates()
+            }
+        }
+    }
+
+    func remainingSeconds(at date: Date) -> TimeInterval? {
+        let countdowns = presentationStates.compactMap { state -> AlarmPresentationState.Mode.Countdown? in
+            if case .countdown(let countdown) = state.mode {
+                return countdown
+            }
+
+            return nil
+        }
+
+        if let countdown = countdowns.min(by: { $0.fireDate < $1.fireDate }) {
+            return max(0, countdown.fireDate.timeIntervalSince(date))
+        }
+
+        let pausedStates = presentationStates.compactMap { state -> AlarmPresentationState.Mode.Paused? in
+            if case .paused(let paused) = state.mode {
+                return paused
+            }
+
+            return nil
+        }
+
+        if let paused = pausedStates.first {
+            return max(0, paused.totalCountdownDuration - paused.previouslyElapsedDuration)
+        }
+
+        if presentationStates.contains(where: {
+            if case .alert = $0.mode { return true }
+            return false
+        }) {
+            return 0
+        }
+
+        return alarmRemainingSeconds(at: date)
+    }
+
+    private func alarmRemainingSeconds(at date: Date) -> TimeInterval? {
+        guard let alarm = alarms.first(where: {
+            $0.state == .countdown || $0.state == .paused || $0.state == .alerting
+        }) else {
+            return nil
+        }
+
+        if alarm.state == .alerting {
+            return 0
+        }
+
+        if case .fixed(let fireDate) = alarm.schedule {
+            return max(0, fireDate.timeIntervalSince(date))
+        }
+
+        return nil
     }
 
     private func localizedTitle(_ text: String) -> LocalizedStringResource {
         LocalizedStringResource(String.LocalizationValue(text))
     }
 
-    func displayText(for alarm: Alarm) -> String {
-        if let duration = alarm.countdownDuration?.preAlert {
-            return TimerFormat.duration(duration)
-        }
-
-        switch alarm.schedule {
-        case .fixed(let date):
-            return date.formatted(date: .omitted, time: .shortened)
-        case .relative(let relative):
-            return String(format: "%02d:%02d", relative.time.hour, relative.time.minute)
-        case nil:
-            return "00:00"
-        @unknown default:
-            return "00:00"
-        }
-    }
 }
 #endif
