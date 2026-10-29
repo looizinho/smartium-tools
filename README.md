@@ -10,9 +10,10 @@ Base em SwiftUI para uma coleção de ferramentas. O objetivo é manter uma inte
 - Live Activity e Ilha Dinâmica no iOS, com ações para alternar o estado e encerrar a sessão.
 - Ao ativar uma Live Activity ou mudar o estado, o orbe usa a cor de destaque e se move por cinco segundos; depois, volta à paleta padrão e fica estático. O movimento respeita Reduzir Movimento e os limites de execução do iOS.
 - Aparência configurável pelo iCloud Drive, compartilhada com widgets e Live Activities.
+- AlarmKit no iOS para alarmes com contagem regressiva, incluindo Ilha Dinâmica e Atividade ao Vivo.
 - No macOS, navegação na toolbar e título da janela oculto para evitar redundância.
 
-A aba **Voice ring** é um espaço reservado. **AlarmKit ainda não está integrado**; sua adoção foi avaliada como próximo recurso para iOS.
+A aba **Voice ring** é um espaço reservado. **AlarmKit** já agenda alarmes com contagem regressiva; alarmes recorrentes ainda não estão implementados.
 
 ## Requisitos e execução
 
@@ -68,6 +69,7 @@ As configurações são relidas ao abrir ou voltar ao app, após a sincronizaç�
 | `SmartiumTools/ThinkingOrbsKit/` | Geometria, presets, renderer e snapshots dos orbes |
 | `SmartiumTools/SmartiumCapabilities/` | Estado compartilhado, aparência, intents, widgets e Live Activity |
 | `SmartiumTools/ICloudSettings.swift` | Criação e leitura coordenada de `settings.json` |
+| `SmartiumTools/AlarmKitView.swift` | Tela do AlarmKit, contagem regressiva e agendamento no iOS |
 | `SmartiumWidgets/` | Entrada e assets da extensão WidgetKit |
 | `SmartiumTools.xcodeproj/` | Targets, schemes e configuração de build |
 

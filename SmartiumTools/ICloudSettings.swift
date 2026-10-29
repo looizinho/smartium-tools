@@ -7,8 +7,14 @@ import Foundation
 import OSLog
 
 enum ICloudSettings {
-    nonisolated private struct Document: Decodable {
+    nonisolated private struct Document: Codable {
         let appearance: AppearanceSettings?
+        var limitimer: LimitimerSettings?
+    }
+
+    nonisolated private struct LegacyRecentTimer: Decodable {
+        let duration: TimeInterval
+        let label: String?
     }
 
     nonisolated static func loadAppearance() async -> AppearanceSettings? {
@@ -94,5 +100,117 @@ enum ICloudSettings {
                 logger.info("settings.json já existe no iCloud e foi preservado.")
             }
         }.value
+    }
+
+    nonisolated static func loadLimitimer() async -> LimitimerSettings {
+        await Task.detached(priority: .utility) {
+            let logger = Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
+            let (document, readError) = readDocument()
+
+            if let limitimer = document?.limitimer {
+                return limitimer
+            }
+
+            if let readError {
+                logger.error("Falha ao ler Limitimer: \(readError.localizedDescription, privacy: .public)")
+            }
+
+            let defaults = UserDefaults(suiteName: ToolSharedState.appGroupIdentifier) ?? .standard
+            let legacyRecents = defaults.data(forKey: "dev.smartium.tools.timerRecents")
+                .flatMap { try? JSONDecoder().decode([LegacyRecentTimer].self, from: $0) }
+                .map { recents in
+                    recents.prefix(LimitimerSettings.maximumRecents).map { recent in
+                        LimitimerRecent(duration: recent.duration, message: recent.label ?? "")
+                    }
+                } ?? []
+
+            let settings = LimitimerSettings(recents: legacyRecents)
+            await saveLimitimer(settings)
+            return settings
+        }.value
+    }
+
+    nonisolated static func saveLimitimer(_ settings: LimitimerSettings) async {
+        await Task.detached(priority: .utility) {
+            let (document, readError) = readDocument()
+            guard readError == nil else {
+                Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
+                    .error("Não foi possível atualizar Limitimer: \(readError?.localizedDescription ?? "desconhecido", privacy: .public)")
+                return
+            }
+
+            var updatedDocument = document ?? Document(appearance: nil, limitimer: nil)
+            updatedDocument.limitimer = settings
+
+            guard let containerURL = FileManager.default.url(
+                forUbiquityContainerIdentifier: "iCloud.dev.smartium.tests"
+            ) else {
+                Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
+                    .notice("iCloud indisponível; Limitimer não foi salvo em settings.json.")
+                return
+            }
+
+            let settingsURL = containerURL.appendingPathComponent("Documents/settings.json")
+            let coordinator = NSFileCoordinator(filePresenter: nil)
+            var coordinationError: NSError?
+            var writeError: Error?
+
+            coordinator.coordinate(writingItemAt: settingsURL, options: [], error: &coordinationError) { writableURL in
+                do {
+                    let encoder = JSONEncoder()
+                    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                    let data = try encoder.encode(updatedDocument)
+                    try data.write(to: writableURL)
+                } catch {
+                    writeError = error
+                }
+            }
+
+            if let error = coordinationError ?? writeError {
+                Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
+                    .error("Falha ao salvar Limitimer: \(error.localizedDescription, privacy: .public)")
+            }
+        }.value
+    }
+
+    nonisolated private static func readDocument() -> (Document?, Error?) {
+        let fileManager = FileManager.default
+        guard let containerURL = fileManager.url(
+            forUbiquityContainerIdentifier: "iCloud.dev.smartium.tests"
+        ) else {
+            return (nil, nil)
+        }
+
+        let settingsURL = containerURL.appendingPathComponent("Documents/settings.json")
+        if fileManager.isUbiquitousItem(at: settingsURL) {
+            try? fileManager.startDownloadingUbiquitousItem(at: settingsURL)
+        }
+
+        for attempt in 0..<3 {
+            var coordinationError: NSError?
+            var result: Document?
+            var readError: Error?
+
+            NSFileCoordinator().coordinate(readingItemAt: settingsURL, options: [], error: &coordinationError) { readableURL in
+                do {
+                    let data = try Data(contentsOf: readableURL)
+                    result = data.isEmpty ? Document(appearance: nil, limitimer: nil) : try JSONDecoder().decode(Document.self, from: data)
+                } catch {
+                    readError = error
+                }
+            }
+
+            if let result {
+                return (result, nil)
+            }
+
+            if attempt == 2 {
+                return (nil, coordinationError ?? readError)
+            }
+
+            Thread.sleep(forTimeInterval: 1)
+        }
+
+        return (nil, nil)
     }
 }

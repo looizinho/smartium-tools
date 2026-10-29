@@ -37,6 +37,7 @@
             "ICloudSettings.swift",
             "SmartiumToolsApp.swift",
             "SpinComponent.swift",
+            "AlarmKitView.swift",
           ],
         },
       ],
