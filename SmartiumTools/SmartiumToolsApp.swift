@@ -20,7 +20,12 @@ struct SmartiumToolsApp: App {
                 .toolbar(removing: .title)
                 #endif
                 .environment(\.smartiumAppearance, appearance)
+                #if os(iOS)
+                // The design is dark-only. The iCloud theme still applies to widgets and Live Activity.
+                .preferredColorScheme(.dark)
+                #else
                 .preferredColorScheme(appearance.colorScheme)
+                #endif
                 .tint(appearance.accentColor)
                 .task {
                     _ = await ICloudSettings.loadLimitimer()
@@ -39,5 +44,10 @@ struct SmartiumToolsApp: App {
                     #endif
                 }
         }
+        #if os(macOS)
+        // v0.2: content runs under the title bar; the sidebar starts 64pt down.
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1180, height: 740)
+        #endif
     }
 }

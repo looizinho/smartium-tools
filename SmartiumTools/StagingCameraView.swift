@@ -9,30 +9,16 @@ struct StagingCameraView: View {
     var body: some View {
         ZStack {
             CameraPreview(session: cameraManager.session)
-                .clipShape(RoundedRectangle(cornerRadius: 28))
+                .clipShape(RoundedRectangle(cornerRadius: StRadius.card, style: .continuous))
 
             if !cameraManager.isRunning {
-                VStack(spacing: 14) {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 42, weight: .medium))
-                        .padding(22)
-                        .background(Circle().fill(.quinary))
-
-                    Text(cameraManager.statusMessage)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(28)
-                .background(
-                    RoundedRectangle(cornerRadius: 28)
-                        .fill(.ultraThinMaterial)
+                StagingPlaceholder(
+                    title: cameraManager.statusMessage,
+                    message: "O preview da câmera traseira ocupa este painel inteiro."
                 )
-                .padding(24)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(20)
         .task {
             await cameraManager.startPreview()
         }

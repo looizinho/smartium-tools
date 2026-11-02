@@ -14,36 +14,106 @@ import Observation
 #endif
 
 struct AlarmKitView: View {
-    @Environment(\.smartiumAppearance) private var appearance
-
     var body: some View {
         #if canImport(AlarmKit) && os(iOS)
         AlarmKitViewContent()
         #else
-        VStack(spacing: 18) {
-            Image(systemName: "timer")
-                .font(.system(size: 42, weight: .medium))
-                .foregroundStyle(appearance.accentColor)
-                .padding(22)
-                .background(
-                    Circle()
-                        .fill(appearance.accentColor.opacity(0.12))
-                )
-
-            Text("Área reservada para implementar alarmes com o AlarmKit.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        StAdaptiveToolLayout(tool: .timer, tag: "Timer") { size in
+            StTimerRing(
+                size: size,
+                fraction: 1,
+                label: "DEFINIDO",
+                clock: "05:00",
+                status: "Pronto"
+            )
+        } controls: {
+            StToolHeader(
+                title: "Timer",
+                subtitle: "Disponível no iPhone (AlarmKit)",
+                tool: .timer,
+                status: .configured
+            )
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         #endif
     }
 }
 
-#if canImport(AlarmKit) && os(iOS)
-private struct SmartiumAlarmMetadata: AlarmMetadata {}
+/// Timer hero (v0.2): Menta progress ring, Sky tick ring, label + clock + status.
+struct StTimerRing: View {
+    let size: CGFloat
+    /// Remaining fraction, 0–1.
+    let fraction: Double
+    let label: String
+    let clock: String
+    let status: String
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let timer = StTool.timer
+        let sky = StAccent.sky
+        // SVG viewBox 100: ring r44 stroke 5, ticks r37 stroke 1.6.
+        let unit = size / 100
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        stops: [
+                            .init(color: timer.opacity(0.22), location: 0),
+                            .init(color: sky.color(opacity: 0.08), location: 0.5),
+                            .init(color: timer.opacity(0), location: 0.7)
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: size * 1.12 * 0.5
+                    )
+                )
+                .padding(-size * 0.06)
+
+            Circle()
+                .stroke(timer.opacity(0.14), lineWidth: 5 * unit)
+                .frame(width: 88 * unit, height: 88 * unit)
+
+            Circle()
+                .trim(from: 0, to: min(max(fraction, 0), 1))
+                .stroke(timer.tone, style: StrokeStyle(lineWidth: 5 * unit, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .frame(width: 88 * unit, height: 88 * unit)
+                .animation(reduceMotion ? nil : .linear(duration: 0.9), value: fraction)
+
+            Circle()
+                .stroke(
+                    sky.color(opacity: 0.45),
+                    style: StrokeStyle(lineWidth: 1.6 * unit, lineCap: .round, dash: [0.1 * unit, 3.77 * unit])
+                )
+                .frame(width: 74 * unit, height: 74 * unit)
+
+            VStack(spacing: 2) {
+                Text(label)
+                    .font(.stTag)
+                    .tracking(1.4)
+                    .foregroundStyle(sky.color)
+                Text(clock)
+                    .font(.system(size: (size * 0.2).rounded(), weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .tracking(-1)
+                    .foregroundStyle(Color.stTextPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .contentTransition(.numericText())
+                    .animation(reduceMotion ? nil : .snappy, value: clock)
+                Text(status)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.stTextPrimary.opacity(0.55))
+            }
+            .frame(width: 70 * unit)
+            .accessibilityElement(children: .combine)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+#if canImport(AlarmKit) && os(iOS)
 private nonisolated enum TimerFormat {
     static func duration(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.rounded()))
@@ -60,8 +130,23 @@ private nonisolated enum TimerFormat {
 
 }
 
+/// Timer shortcuts (v0.2 "ATALHOS").
+private struct TimerShortcut: Hashable {
+    let seconds: Int
+    let title: String
+    let color: StRGB
+    var message: String? = nil
+
+    static let all: [TimerShortcut] = [
+        TimerShortcut(seconds: 60, title: "1 min", color: StAccent.sky),
+        TimerShortcut(seconds: 300, title: "5 min", color: StTool.timer.rgb),
+        TimerShortcut(seconds: 600, title: "10 min", color: StTool.fx.rgb),
+        TimerShortcut(seconds: 1_500, title: "Pomodoro", color: StTool.voice.rgb, message: "Pomodoro"),
+        TimerShortcut(seconds: 2_700, title: "45 min", color: StTool.orb.rgb)
+    ]
+}
+
 private struct AlarmKitViewContent: View {
-    @Environment(\.smartiumAppearance) private var appearance
     @State private var manager = AlarmKitManager()
     @State private var selectedHours = 0
     @State private var selectedMinutes = 5
@@ -69,67 +154,39 @@ private struct AlarmKitViewContent: View {
     @State private var limitimerSettings = LimitimerSettings()
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    let remaining = manager.remainingSeconds(at: context.date) ?? selectedDuration
-
-                    Text(TimerFormat.duration(remaining))
-                        .font(.system(size: 52, weight: .light, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(.primary)
-                        .contentTransition(.numericText())
-                        .animation(.snappy, value: remaining)
-                        .accessibilityLabel("Tempo restante")
-                }
-
-                Spacer()
-
-                Button {
-                    startTimer()
-                } label: {
-                    Image(systemName: "play.fill")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(appearance.accentColor)
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(.quinary))
-                }
-                .disabled(selectedDuration == 0 || manager.isWorking)
+        StAdaptiveToolLayout(tool: .timer, tag: "Timer") { size in
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let remaining = manager.remainingSeconds(at: context.date)
+                let total = manager.totalDuration ?? selectedDuration
+                StTimerRing(
+                    size: size,
+                    fraction: remaining.map { total > 0 ? $0 / total : 0 } ?? 1,
+                    label: remaining == nil ? "DEFINIDO" : "RESTANTE",
+                    clock: TimerFormat.duration(remaining ?? selectedDuration),
+                    status: ringStatus
+                )
             }
-            .padding(.horizontal)
-            .padding(.top, 8)
-            .padding(.bottom, 12)
-
-            ScrollView {
-                VStack(spacing: 28) {
-                    durationPicker
-
-                    VStack(alignment: .leading, spacing: 16) {
-                        TextField("Mensagem de encerramento", text: $limitimerSettings.endMessage)
-                            .font(.title3.weight(.medium))
-                    }
-                    .padding(20)
-                    .background(
-                        RoundedRectangle(cornerRadius: 22)
-                            .fill(.quinary)
-                    )
-
-                    if !limitimerSettings.recents.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Recentes")
-                                .font(.title2.bold())
-                                .padding(.bottom, 8)
-
-                            ForEach(limitimerSettings.recents) { recent in
-                                recentRow(recent)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 24)
+        } controls: {
+            StToolHeader(
+                title: "Timer",
+                subtitle: headerStatus.title,
+                tool: .timer,
+                status: headerStatus.dot
+            )
+            durationPicker
+            controls
+            messageField
+            StChipSection(
+                title: "Atalhos",
+                dot: StTool.timer.secondary,
+                items: TimerShortcut.all,
+                label: \.title,
+                color: \.color,
+                isOn: { Double($0.seconds) == currentDuration },
+                select: startShortcut
+            )
+            if !limitimerSettings.recents.isEmpty {
+                recents
             }
         }
         .alert("Timer", item: Binding(
@@ -156,18 +213,76 @@ private struct AlarmKitViewContent: View {
         Double(selectedHours * 3_600 + selectedMinutes * 60 + selectedSeconds)
     }
 
+    /// The running timer's total, or the picker value when idle.
+    private var currentDuration: TimeInterval {
+        activeAlarm == nil ? selectedDuration : (manager.totalDuration ?? selectedDuration)
+    }
+
+    /// The alarm the screen controls: the first one counting down, paused or alerting.
+    private var activeAlarm: Alarm? {
+        manager.alarms.first {
+            $0.state == .countdown || $0.state == .paused || $0.state == .alerting
+        }
+    }
+
+    private var headerStatus: (title: String, dot: StHeaderStatus) {
+        switch activeAlarm?.state {
+        case .countdown: ("Em andamento", .active)
+        case .paused: ("Pausado", .ready)
+        case .alerting: ("Encerrado!", .active)
+        default: ("Pronto para iniciar", .configured)
+        }
+    }
+
+    private var ringStatus: String {
+        switch activeAlarm?.state {
+        case .countdown: "Em andamento…"
+        case .paused: "Pausado"
+        case .alerting: "Encerrado!"
+        default: "Pronto"
+        }
+    }
+
+    // MARK: Picker
+
     private var durationPicker: some View {
-        HStack(spacing: 0) {
-            picker(selection: $selectedHours, range: 0...23, label: "horas")
+        let timer = StTool.timer
+        return HStack(spacing: 0) {
+            picker(selection: $selectedHours, range: 0...23, label: "h")
             picker(selection: $selectedMinutes, range: 0...59, label: "min")
             picker(selection: $selectedSeconds, range: 0...59, label: "s")
         }
-        .overlay(alignment: .center) {
+        .frame(width: 312, height: 150)
+        .background {
             Capsule()
-                .fill(.quinary)
-                .frame(height: 54)
+                .fill(timer.opacity(0.14))
+                .overlay(Capsule().strokeBorder(timer.opacity(0.30), lineWidth: 1))
+                .frame(height: 42)
                 .allowsHitTesting(false)
         }
+        .mask(
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .black, location: 0.24),
+                    .init(color: .black, location: 0.76),
+                    .init(color: .clear, location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .disabled(activeAlarm != nil)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(Color.stInk800)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .strokeBorder(.white.opacity(0.06), lineWidth: 1)
+                )
+        )
     }
 
     private func picker(
@@ -178,49 +293,146 @@ private struct AlarmKitViewContent: View {
         Picker(label, selection: selection) {
             ForEach(range, id: \.self) { value in
                 Text("\(value)")
+                    .monospacedDigit()
                     .tag(value)
             }
         }
         .pickerStyle(.wheel)
         .labelsHidden()
-        .frame(maxWidth: .infinity)
+        .frame(width: 104, height: 150)
+        .clipped()
         .overlay {
             Text(label)
-                .font(.body.weight(.medium))
-                .offset(x: label == "s" ? 28 : 42)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(StTool.timer.tone)
+                .offset(x: label == "min" ? 34 : 26)
                 .allowsHitTesting(false)
         }
     }
 
-    private func recentRow(_ recent: LimitimerRecent) -> some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
+    // MARK: Controls
+
+    private var controls: some View {
+        HStack(spacing: 10) {
+            primaryButton
+            StButton("Zerar", systemImage: "arrow.counterclockwise", kind: .iconTinted(.voice)) {
+                if let activeAlarm {
+                    manager.cancel(activeAlarm)
+                }
+            }
+            .disabled(activeAlarm == nil)
+        }
+    }
+
+    private var primaryButton: some View {
+        let (title, symbol): (LocalizedStringKey, String) = switch activeAlarm?.state {
+        case .countdown: ("Pausar", "pause.fill")
+        case .paused: ("Retomar", "play.fill")
+        case .alerting: ("Parar", "stop.fill")
+        default: ("Iniciar", "play.fill")
+        }
+
+        return StButton(title, systemImage: symbol, kind: .primary(.timer)) {
+            if let activeAlarm {
+                manager.toggle(activeAlarm)
+            } else {
+                startTimer()
+            }
+        }
+        .disabled(activeAlarm == nil && (selectedDuration == 0 || manager.isWorking))
+    }
+
+    private var messageField: some View {
+        let sky = StAccent.sky
+        let shape = RoundedRectangle(cornerRadius: StRadius.row, style: .continuous)
+        return HStack(spacing: 12) {
+            Image(systemName: "text.bubble")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(sky.color)
+                .frame(width: 38, height: 38)
+                .background(
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .fill(sky.color(opacity: 0.16))
+                )
+                .accessibilityHidden(true)
+            TextField("Mensagem de encerramento", text: $limitimerSettings.endMessage)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Color.stTextPrimary)
+                .submitLabel(.done)
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 16)
+        .frame(height: 58)
+        .background(shape.fill(Color.stInk800))
+        .overlay(shape.strokeBorder(sky.color(opacity: 0.22), lineWidth: 1))
+    }
+
+    // MARK: Recents
+
+    private var recents: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recentes")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .padding(.top, 8)
+                .padding(.horizontal, 4)
+                .accessibilityAddTraits(.isHeader)
+
+            ForEach(Array(limitimerSettings.recents.enumerated()), id: \.element.id) { index, recent in
+                recentRow(recent, color: [StAccent.sky, StTool.voice.rgb, StTool.fx.rgb, StTool.orb.rgb][index % 4])
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func recentRow(_ recent: LimitimerRecent, color: StRGB) -> some View {
+        let shape = RoundedRectangle(cornerRadius: StRadius.row, style: .continuous)
+        return HStack(alignment: .center, spacing: 14) {
+            Image(systemName: "timer")
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(color.color)
+                .frame(width: 44, height: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .fill(color.color(opacity: 0.16))
+                )
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 0) {
                 Text(TimerFormat.duration(recent.duration))
-                    .font(.system(size: 44, weight: .light, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 24, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.stTextPrimary)
 
                 Text(recent.message.isEmpty ? "Sem mensagem" : recent.message)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.stTextPrimary.opacity(0.55))
+                    .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
             Button {
                 applyDuration(Int(recent.duration))
                 startTimer(duration: recent.duration, message: recent.message)
             } label: {
                 Image(systemName: "play.fill")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(appearance.accentColor)
-                    .frame(width: 54, height: 54)
-                    .background(Circle().fill(.quinary))
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(StTool.timer.tone)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(StTool.timer.opacity(0.16)))
             }
+            .buttonStyle(StPressStyle())
+            .accessibilityLabel("Iniciar \(TimerFormat.duration(recent.duration))")
         }
-        .padding(.vertical, 10)
-        .overlay(alignment: .bottom) {
-            Divider()
-        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(shape.fill(Color.stInk800))
+        .overlay(shape.strokeBorder(.white.opacity(0.05), lineWidth: 1))
+    }
+
+    private func startShortcut(_ shortcut: TimerShortcut) {
+        applyDuration(shortcut.seconds)
+        startTimer(duration: Double(shortcut.seconds), message: shortcut.message ?? limitimerSettings.endMessage)
     }
 
     private func applyDuration(_ seconds: Int) {
@@ -240,10 +452,15 @@ private struct AlarmKitViewContent: View {
         )
         saveTimerSettings()
 
+        // The screen controls a single timer: a new start replaces the active one.
+        if let activeAlarm {
+            manager.cancel(activeAlarm)
+        }
+
         Task {
             await manager.scheduleTimer(
                 duration: timerDuration,
-                tint: appearance.accentColor,
+                tint: StTool.timer.tone,
                 message: endMessage
             )
         }
@@ -268,6 +485,8 @@ private final class AlarmKitManager {
     private(set) var presentationStates: [AlarmPresentationState] = []
     private(set) var authorizationState: AlarmManager.AuthorizationState = .notDetermined
     private(set) var isWorking = false
+    /// Duration of the last timer this screen scheduled.
+    private(set) var scheduledDuration: TimeInterval?
     private(set) var lastErrorMessage: String?
 
     private var presentationMonitorTask: Task<Void, Never>?
@@ -320,6 +539,7 @@ private final class AlarmKitManager {
             )
             let attributes = AlarmAttributes<SmartiumAlarmMetadata>(
                 presentation: presentation,
+                metadata: SmartiumAlarmMetadata(tool: .timer),
                 tintColor: tint
             )
             let configuration = AlarmManager.AlarmConfiguration.timer(
@@ -328,6 +548,7 @@ private final class AlarmKitManager {
             )
 
             _ = try await AlarmManager.shared.schedule(id: UUID(), configuration: configuration)
+            scheduledDuration = duration
             refresh()
         } catch {
             lastErrorMessage = error.localizedDescription
@@ -396,6 +617,22 @@ private final class AlarmKitManager {
                 self?.refreshPresentationStates()
             }
         }
+    }
+
+    /// Total duration of the active countdown, from AlarmKit's presentation state.
+    var totalDuration: TimeInterval? {
+        for state in presentationStates {
+            switch state.mode {
+            case .countdown(let countdown): return countdown.totalCountdownDuration
+            case .paused(let paused): return paused.totalCountdownDuration
+            default: continue
+            }
+        }
+        return activeAlarmExists ? scheduledDuration : nil
+    }
+
+    private var activeAlarmExists: Bool {
+        alarms.contains { $0.state == .countdown || $0.state == .paused || $0.state == .alerting }
     }
 
     func remainingSeconds(at date: Date) -> TimeInterval? {
