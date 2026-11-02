@@ -23,6 +23,9 @@ nonisolated public struct SmartiumActivityAttributes: ActivityAttributes, Sendab
         /// Absolute deadline for the latest activation or orb state change.
         public var animationEndsAt: Date?
         public var appearance: AppearanceSettings?
+        /// Tool that owns the activity (`StTool.rawValue`); its color tints the island.
+        /// Optional so states encoded before v0.2 still decode.
+        public var toolRaw: String?
 
         public init(
             orbStateRaw: String = "working",
@@ -30,7 +33,8 @@ nonisolated public struct SmartiumActivityAttributes: ActivityAttributes, Sendab
             stepProgress: Double? = nil,
             updatedAt: Date = .now,
             animationEndsAt: Date? = nil,
-            appearance: AppearanceSettings? = nil
+            appearance: AppearanceSettings? = nil,
+            toolRaw: String? = "orb"
         ) {
             self.orbStateRaw = orbStateRaw
             self.statusText = statusText
@@ -38,6 +42,12 @@ nonisolated public struct SmartiumActivityAttributes: ActivityAttributes, Sendab
             self.updatedAt = updatedAt
             self.animationEndsAt = animationEndsAt
             self.appearance = appearance
+            self.toolRaw = toolRaw
+        }
+
+        /// Owning tool; activities from before v0.2 are the Orb's.
+        var tool: StTool {
+            toolRaw.flatMap(StTool.init(rawValue:)) ?? .orb
         }
 
         /// A new state starts a fresh five-second window; progress-only updates do not.
@@ -46,17 +56,6 @@ nonisolated public struct SmartiumActivityAttributes: ActivityAttributes, Sendab
             orbStateRaw = rawValue
             updatedAt = now
             animationEndsAt = now.addingTimeInterval(5)
-        }
-
-        /// Freeze exactly at the deadline, preserving status and progress.
-        public mutating func advanceActivation(to now: Date, reduceMotion: Bool) {
-            guard let deadline = animationEndsAt else { return }
-            if now >= deadline {
-                updatedAt = deadline
-                animationEndsAt = nil
-            } else if !reduceMotion {
-                updatedAt = now
-            }
         }
     }
 
@@ -78,8 +77,9 @@ extension SmartiumActivityAttributes.ContentState {
 }
 
 /// Reusable manager for starting, updating, and ending Dynamic Island Live Activities
-/// from any future SmartiumTools capability. Animation updates preserve the
-/// activity content and run only while iOS grants the app execution time.
+/// from any future SmartiumTools capability. Each change is one ActivityKit update;
+/// the five-second highlight ends through the content's `staleDate`, so no
+/// background loop competes with the next state change.
 @MainActor
 @Observable
 public final class LiveActivityManager {
@@ -91,9 +91,6 @@ public final class LiveActivityManager {
     private var activityMonitorTask: Task<Void, Never>?
     #if SMARTIUM_APP
     private var lifecycleTasks: [Task<Void, Never>] = []
-    private var animationTask: Task<Void, Never>?
-    private var animationGeneration = UUID()
-    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     #endif
 
     public var isRunning: Bool {
@@ -121,7 +118,6 @@ public final class LiveActivityManager {
     /// Synchronizes `currentActivity` with ActivityKit's live list of active sessions.
     public func syncActiveActivity() {
         currentActivity = activeActivities.first
-        reconcileAnimation()
     }
 
     private func observeActivities() {
@@ -169,7 +165,8 @@ public final class LiveActivityManager {
             stepProgress: progress,
             updatedAt: .now,
             animationEndsAt: Date.now.addingTimeInterval(5),
-            appearance: .load()
+            appearance: .load(),
+            toolRaw: StTool.orb.rawValue
         )
 
         do {
@@ -179,7 +176,6 @@ public final class LiveActivityManager {
                 pushType: nil
             )
             currentActivity = activity
-            reconcileAnimation()
         } catch {
             lastErrorMessage = error.localizedDescription
         }
@@ -203,7 +199,6 @@ public final class LiveActivityManager {
         let activities = activeActivities
         guard !activities.isEmpty else {
             currentActivity = nil
-            stopAnimation()
             return
         }
         currentActivity = activities.first
@@ -216,7 +211,6 @@ public final class LiveActivityManager {
             updatedState.appearance = .load()
             await activity.update(ActivityContent(state: updatedState, staleDate: updatedState.animationEndsAt))
         }
-        reconcileAnimation()
     }
 
     /// Ask WidgetKit to render the newly cached appearance without restarting animation.
@@ -230,7 +224,6 @@ public final class LiveActivityManager {
 
     /// Ends all active SmartiumTools Live Activities immediately.
     public func stop() async {
-        stopAnimation()
         lastErrorMessage = nil
         for activity in Activity<SmartiumActivityAttributes>.activities {
             await activity.end(nil, dismissalPolicy: .immediate)
@@ -241,8 +234,7 @@ public final class LiveActivityManager {
     #if SMARTIUM_APP
     private func observeLifecycle() {
         for name in [UIApplication.didBecomeActiveNotification,
-                     UIApplication.didEnterBackgroundNotification,
-                     UIAccessibility.reduceMotionStatusDidChangeNotification] {
+                     UIApplication.didEnterBackgroundNotification] {
             lifecycleTasks.append(Task { [weak self] in
                 for await _ in NotificationCenter.default.notifications(named: name) {
                     guard let self else { return }
@@ -251,88 +243,6 @@ public final class LiveActivityManager {
             })
         }
     }
-
-    private func reconcileAnimation() {
-        guard activeActivities.contains(where: { $0.content.state.animationEndsAt != nil }) else {
-            stopAnimation()
-            return
-        }
-        guard animationTask == nil else { return }
-        // Reserve only the short activation window, including when the user
-        // immediately leaves the app to look at the island or Lock Screen.
-        backgroundTaskID = UIApplication.shared.beginBackgroundTask(
-            withName: "SmartiumOrbActivation"
-        ) { [weak self] in
-            guard let self else { return }
-            self.stopAnimation()
-            Task { await self.finishActivation() }
-        }
-        let generation = UUID()
-        animationGeneration = generation
-        animationTask = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self else { break }
-                let now = Date.now
-                let activities = self.activeActivities.filter {
-                    $0.content.state.animationEndsAt != nil
-                }
-                guard !activities.isEmpty else { break }
-                var remaining = 0.35
-                for activity in activities {
-                    guard !Task.isCancelled else { break }
-                    var state = activity.content.state
-                    guard let deadline = state.animationEndsAt else { continue }
-                    if now < deadline {
-                        remaining = min(remaining, deadline.timeIntervalSince(now))
-                    }
-                    state.advanceActivation(to: now, reduceMotion: UIAccessibility.isReduceMotionEnabled)
-                    await activity.update(ActivityContent(state: state, staleDate: state.animationEndsAt))
-                }
-                guard self.activeActivities.contains(where: {
-                    $0.content.state.animationEndsAt != nil
-                }) else { break }
-                do {
-                    try await Task.sleep(for: .seconds(remaining))
-                } catch {
-                    break
-                }
-            }
-            // A canceled task must not clear a replacement loop's handle.
-            if let self, self.animationGeneration == generation {
-                self.animationTask = nil
-                self.endBackgroundTask()
-            }
-        }
-    }
-
-    /// Also used if iOS revokes background time before the five-second deadline.
-    private func finishActivation() async {
-        for activity in activeActivities {
-            var state = activity.content.state
-            guard state.animationEndsAt != nil else { continue }
-            state.animationEndsAt = nil
-            await activity.update(ActivityContent(state: state, staleDate: state.animationEndsAt))
-        }
-    }
-
-    private func stopAnimation() {
-        animationGeneration = UUID()
-        animationTask?.cancel()
-        animationTask = nil
-        endBackgroundTask()
-    }
-
-    private func endBackgroundTask() {
-        guard backgroundTaskID != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(backgroundTaskID)
-        backgroundTaskID = .invalid
-    }
-
-    #else
-    // LiveActivityIntents execute in the host app. The extension only renders
-    // snapshots and must not acquire UIApplication background execution time.
-    private func reconcileAnimation() {}
-    private func stopAnimation() {}
     #endif
 
     /// Convenience toggle for quick testing in the base UI.
