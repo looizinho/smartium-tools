@@ -32,12 +32,14 @@
         {
           "target": "SmartiumWidgetsExtension",
           "exclusions": [
+            "AlarmKitView.swift",
             "Assets.xcassets",
             "ContentView.swift",
+            "DesignSystem/StAdaptiveLayout.swift",
+            "DesignSystem/StDataComponents.swift",
             "ICloudSettings.swift",
             "SmartiumToolsApp.swift",
             "SpinComponent.swift",
-            "AlarmKitView.swift",
             "StagingCameraView.swift",
           ],
         },

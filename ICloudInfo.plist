@@ -8,6 +8,12 @@
     <string>O SmartiumTools usa a câmera para exibir a imagem da aba Staging.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>O SmartiumTools usa o microfone para recursos de áudio da aba Staging.</string>
+    <key>UIAppFonts</key>
+    <array>
+        <string>Arial Rounded Bold.ttf</string>
+    </array>
+    <key>ATSApplicationFontsPath</key>
+    <string>.</string>
     <key>NSUbiquitousContainers</key>
     <dict>
         <key>iCloud.dev.smartium.tests</key>
