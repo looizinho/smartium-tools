@@ -10,6 +10,7 @@ import SwiftUI
 
 #if canImport(AlarmKit) && os(iOS)
 import ActivityKit
+import AppIntents
 import AlarmKit
 import WidgetKit
 
@@ -57,6 +58,8 @@ struct SmartiumTimerLiveActivityWidget: Widget {
                         Text(SmartiumTimerStatus.text(for: context.state))
                             .font(StFont.body(12, .semibold))
                             .foregroundStyle(.white.opacity(0.75))
+                        Spacer()
+                        SmartiumTimerActivityButtons(state: context.state, tool: tool, size: 36)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 6)
@@ -114,6 +117,56 @@ private struct SmartiumTimerCountdownText: View {
     }
 }
 
+/// Pausar/Retomar and Reiniciar in the Live Activity (v0.5). The intents are
+/// `LiveActivityIntent`s, so they run in the app process without opening it
+/// and keep the Timer widgets and control in step. A ringing timer only gets
+/// the stop button.
+private struct SmartiumTimerActivityButtons: View {
+    let state: AlarmPresentationState
+    let tool: StTool
+    let size: CGFloat
+
+    var body: some View {
+        HStack(spacing: 8) {
+            switch state.mode {
+            case .countdown:
+                button(ToggleTimerIntent(running: false), symbol: "pause.fill", label: "Pausar")
+                resetButton
+            case .paused:
+                button(ToggleTimerIntent(running: true), symbol: "play.fill", label: "Retomar")
+                resetButton
+            default:
+                button(ToggleTimerIntent(running: false), symbol: "stop.fill", label: "Parar")
+            }
+        }
+    }
+
+    private func button(_ intent: ToggleTimerIntent, symbol: String, label: String) -> some View {
+        Button(intent: intent) {
+            Image(systemName: symbol)
+                .font(.system(size: size * 0.36, weight: .bold))
+                .foregroundStyle(Color.stInk900)
+                .frame(width: size, height: size)
+                .background(Circle().fill(tool.tone))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private var resetButton: some View {
+        Button(intent: ResetTimerIntent()) {
+            Image(systemName: "arrow.counterclockwise")
+                .font(.system(size: size * 0.36, weight: .bold))
+                .foregroundStyle(StTool.voice.tone)
+                .frame(width: size, height: size)
+                .background(Circle().fill(StTool.voice.opacity(0.16)))
+                .overlay(Circle().strokeBorder(StTool.voice.opacity(0.35), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Reiniciar")
+    }
+}
+
 private nonisolated enum SmartiumTimerStatus {
     static func text(for state: AlarmPresentationState) -> String {
         switch state.mode {
@@ -153,10 +206,13 @@ private struct SmartiumTimerBannerView: View {
 
             Spacer()
 
-            SmartiumTimerCountdownText(state: state)
-                .font(StFont.bigNumber(44))
-                .foregroundStyle(tool.tone)
-                .frame(maxWidth: 140, alignment: .trailing)
+            VStack(alignment: .trailing, spacing: 8) {
+                SmartiumTimerCountdownText(state: state)
+                    .font(StFont.bigNumber(44))
+                    .foregroundStyle(tool.tone)
+                    .frame(maxWidth: 140, alignment: .trailing)
+                SmartiumTimerActivityButtons(state: state, tool: tool, size: 40)
+            }
         }
         .padding(14)
         .background(

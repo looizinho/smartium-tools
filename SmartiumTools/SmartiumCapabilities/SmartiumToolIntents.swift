@@ -102,6 +102,24 @@ struct ToggleTimerIntent: SetValueIntent, LiveActivityIntent {
     }
 }
 
+/// AlarmKit runs this when the ringing timer is stopped from the system alert,
+/// so widgets and the control show "Pronto" right away.
+struct StopTimerIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Parar o timer"
+    static let description = IntentDescription("Para o timer do SmartiumTools.")
+    static let isDiscoverable = false
+
+    init() {}
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        #if SMARTIUM_APP
+        StTimerService.markStopped()
+        #endif
+        return .result()
+    }
+}
+
 /// Timer widget: counts the full duration again from the start.
 struct ResetTimerIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Reiniciar o timer"

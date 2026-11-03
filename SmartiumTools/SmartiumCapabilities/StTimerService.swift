@@ -10,6 +10,7 @@
 import SwiftUI
 
 #if SMARTIUM_APP && canImport(AlarmKit) && os(iOS)
+import ActivityKit
 import AlarmKit
 
 @MainActor
@@ -59,7 +60,7 @@ enum StTimerService {
         let id = UUID()
         _ = try await AlarmManager.shared.schedule(
             id: id,
-            configuration: .timer(duration: duration, attributes: attributes)
+            configuration: .timer(duration: duration, attributes: attributes, stopIntent: StopTimerIntent())
         )
         if startPaused {
             try AlarmManager.shared.pause(id: id)
@@ -85,17 +86,55 @@ enum StTimerService {
             try AlarmManager.shared.stop(id: alarm.id)
             snapshot.phase = .idle
         case .paused where running:
+            let remaining = liveRemaining(at: now) ?? snapshot.pausedRemaining ?? snapshot.lastDuration
             try AlarmManager.shared.resume(id: alarm.id)
             snapshot.phase = .running
-            snapshot.fireDate = now.addingTimeInterval(snapshot.pausedRemaining ?? snapshot.lastDuration)
+            snapshot.fireDate = now.addingTimeInterval(remaining)
         case .countdown where !running:
+            let remaining = liveRemaining(at: now) ?? snapshot.remaining(at: now)
             try AlarmManager.shared.pause(id: alarm.id)
-            snapshot.pausedRemaining = snapshot.remaining(at: now)
+            snapshot.pausedRemaining = remaining
             snapshot.phase = .paused
         default:
             return
         }
+        snapshot.total = snapshot.total ?? liveTotal()
         save(snapshot)
+    }
+
+    /// The system alert's stop button already stopped the alarm.
+    static func markStopped() {
+        var snapshot = StLiveSurfaces.timer
+        guard snapshot.phase != .idle else { return }
+        snapshot.phase = .idle
+        save(snapshot)
+    }
+
+    /// Remaining time from AlarmKit's Live Activity, which is current even
+    /// when the snapshot isn't (e.g. a timer started before the app wrote one).
+    private static func liveRemaining(at date: Date) -> TimeInterval? {
+        for activity in Activity<AlarmAttributes<SmartiumAlarmMetadata>>.activities {
+            switch activity.content.state.mode {
+            case .countdown(let countdown):
+                return max(0, countdown.fireDate.timeIntervalSince(date))
+            case .paused(let paused):
+                return max(0, paused.totalCountdownDuration - paused.previouslyElapsedDuration)
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
+    private static func liveTotal() -> TimeInterval? {
+        for activity in Activity<AlarmAttributes<SmartiumAlarmMetadata>>.activities {
+            switch activity.content.state.mode {
+            case .countdown(let countdown): return countdown.totalCountdownDuration
+            case .paused(let paused): return paused.totalCountdownDuration
+            default: continue
+            }
+        }
+        return nil
     }
 
     /// "Reiniciar": counts the full total again from the start.
