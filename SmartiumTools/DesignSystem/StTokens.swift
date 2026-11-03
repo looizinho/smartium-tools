@@ -7,6 +7,7 @@
 //  colors are defined in sRGB code instead of an asset catalog.
 //
 
+import CoreText
 import SwiftUI
 
 // MARK: - Colors
@@ -222,12 +223,29 @@ nonisolated enum StSpacing {
 /// covers weights 400–800. No SF / `.rounded` text anywhere in the app.
 nonisolated enum StFont {
     static let family = "Nunito"
-    /// PostScript name of `DigitalDotted-Mono.otf`. Only `StBigNumber` uses it.
+    /// PostScript name of `DigitalDotted-Mono.otf`, used by `StBigNumber` and `bigNumber(_:)`.
     static let numberFontName = "DigitalDottedFont-Regular"
 
     /// UI text at a fixed size, for example `StFont.body(15, .semibold)`.
     static func body(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         .custom(family, fixedSize: size).weight(weight)
+    }
+
+    /// Digital Dotted at a fixed size, for numbers the system draws itself, such
+    /// as `Text(timerInterval:)` in the Live Activity (v0.4), where `StBigNumber`
+    /// can't be used. The font has no ":", so it falls back to Nunito 200, whose
+    /// dots match the digits' dots. Elsewhere, prefer `StBigNumber`.
+    static func bigNumber(_ size: CGFloat) -> Font {
+        let weightAxis = 0x7767_6874 // 'wght'
+        let colon = CTFontDescriptorCreateWithAttributes([
+            kCTFontNameAttribute: family,
+            kCTFontVariationAttribute: [weightAxis: 200]
+        ] as CFDictionary)
+        let descriptor = CTFontDescriptorCreateWithAttributes([
+            kCTFontNameAttribute: numberFontName,
+            kCTFontCascadeListAttribute: [colon]
+        ] as CFDictionary)
+        return Font(CTFontCreateWithFontDescriptor(descriptor, size, nil))
     }
 }
 

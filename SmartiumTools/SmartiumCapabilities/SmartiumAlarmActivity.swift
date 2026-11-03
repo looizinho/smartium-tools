@@ -44,7 +44,7 @@ struct SmartiumTimerLiveActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     SmartiumTimerCountdownText(state: context.state)
-                        .font(StFont.body(28, .medium))
+                        .font(StFont.bigNumber(44))
                         .foregroundStyle(tool.tone)
                         .frame(maxWidth: 110, alignment: .trailing)
                         .padding(.trailing, 4)
@@ -65,7 +65,7 @@ struct SmartiumTimerLiveActivityWidget: Widget {
                 SmartiumIslandIcon(tool: tool, size: 22)
             } compactTrailing: {
                 SmartiumTimerCountdownText(state: context.state)
-                    .font(StFont.body(13, .semibold))
+                    .font(StFont.bigNumber(15))
                     .foregroundStyle(tool.tone)
                     .frame(maxWidth: 52)
             } minimal: {
@@ -91,6 +91,8 @@ struct SmartiumIslandIcon: View {
 }
 
 /// Live countdown while running, the frozen remaining time while paused.
+/// Callers set `StFont.bigNumber` in the tool color (v0.4): the system keeps
+/// drawing the countdown, so it stays live without app updates.
 private struct SmartiumTimerCountdownText: View {
     let state: AlarmPresentationState
 
@@ -108,6 +110,7 @@ private struct SmartiumTimerCountdownText: View {
         .monospacedDigit()
         .multilineTextAlignment(.trailing)
         .lineLimit(1)
+        .minimumScaleFactor(0.6)
     }
 }
 
@@ -151,7 +154,7 @@ private struct SmartiumTimerBannerView: View {
             Spacer()
 
             SmartiumTimerCountdownText(state: state)
-                .font(StFont.body(34, .medium))
+                .font(StFont.bigNumber(44))
                 .foregroundStyle(tool.tone)
                 .frame(maxWidth: 140, alignment: .trailing)
         }
