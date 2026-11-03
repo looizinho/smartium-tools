@@ -19,6 +19,7 @@ struct StagingCameraView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .stBorderBeam(.fx, cornerRadius: StRadius.card)
         .task {
             await cameraManager.startPreview()
         }

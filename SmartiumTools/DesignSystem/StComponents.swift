@@ -645,6 +645,7 @@ struct StToolHeader: View {
       )
     )
     .overlay(shape.strokeBorder(tool.opacity(0.38), lineWidth: 1))
+    .stBorderBeam(tool)
     .accessibilityElement(children: .combine)
   }
 }
