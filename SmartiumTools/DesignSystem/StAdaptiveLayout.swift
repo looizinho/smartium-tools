@@ -68,24 +68,39 @@ struct StAppHeader: View {
 
 /// One content definition per screen, arranged as Hero + Controls for the
 /// current `stLayoutMode`. `hero` receives the hero size.
+///
+/// `showsHero: false` hides the Hero on iPhone (v0.4): Controls move up in
+/// portrait and take the full width in landscape. The Mac always shows it.
 struct StAdaptiveToolLayout<Hero: View, Controls: View>: View {
   let tool: StTool
   let tag: String
+  private let showsHero: Bool
   private let hero: (CGFloat) -> Hero
   private let controls: Controls
 
   @Environment(\.stLayoutMode) private var mode
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   init(
     tool: StTool,
     tag: String,
+    showsHero: Bool = true,
     @ViewBuilder hero: @escaping (CGFloat) -> Hero,
     @ViewBuilder controls: () -> Controls
   ) {
     self.tool = tool
     self.tag = tag
+    self.showsHero = showsHero
     self.hero = hero
     self.controls = controls()
+  }
+
+  private var heroTransition: AnyTransition {
+    reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92))
+  }
+
+  private var heroAnimation: Animation {
+    reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.4)
   }
 
   var body: some View {
@@ -93,11 +108,15 @@ struct StAdaptiveToolLayout<Hero: View, Controls: View>: View {
     case .portrait:
       ScrollView {
         VStack(spacing: 14) {
-          hero(mode.heroSize)
-            .frame(maxWidth: .infinity)
-            .frame(height: mode.heroSize + 26)
+          if showsHero {
+            hero(mode.heroSize)
+              .frame(maxWidth: .infinity)
+              .frame(height: mode.heroSize + 26)
+              .transition(heroTransition)
+          }
           controlsStack
         }
+        .animation(heroAnimation, value: showsHero)
         .padding(.top, 4)
         .padding(.horizontal, StSpacing.screenMargin)
         .padding(.bottom, 24)
@@ -111,9 +130,12 @@ struct StAdaptiveToolLayout<Hero: View, Controls: View>: View {
 
     case .landscape:
       HStack(alignment: .top, spacing: 22) {
-        hero(mode.heroSize)
-          .frame(width: 300)
-          .frame(maxHeight: .infinity)
+        if showsHero {
+          hero(mode.heroSize)
+            .frame(width: 300)
+            .frame(maxHeight: .infinity)
+            .transition(heroTransition)
+        }
         ScrollView {
           controlsStack
             .padding(.top, 2)
@@ -125,6 +147,7 @@ struct StAdaptiveToolLayout<Hero: View, Controls: View>: View {
           stickyHeader(top: 4)
         }
       }
+      .animation(heroAnimation, value: showsHero)
       .padding(.top, 16)
 
     case .mac:

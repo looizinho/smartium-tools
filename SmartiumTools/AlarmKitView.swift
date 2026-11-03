@@ -38,8 +38,14 @@ struct AlarmKitView: View {
     }
 }
 
+/// Timer limits (v0.4): the tool is for events and talks, so 2 h at most.
+nonisolated enum StTimer {
+    static let maxDuration: TimeInterval = 7_200
+}
+
 /// Timer hero: Menta progress ring, Sky tick ring, label + clock + status.
-/// The clock is a white `StBigNumber` without glow (v0.3).
+/// The clock is a white `StBigNumber` without glow (v0.3), at 20% of the hero
+/// for mm:ss and 14% for h:mm:ss so it stays inside the ring (v0.4).
 struct StTimerRing: View {
     let size: CGFloat
     /// Remaining fraction, 0–1.
@@ -68,7 +74,7 @@ struct StTimerRing: View {
                     .font(.stTag)
                     .tracking(1.4)
                     .foregroundStyle(sky.color)
-                StBigNumber(clock, size: (size * 0.2).rounded())
+                StBigNumber(clock, size: (size * (clock.count > 5 ? 0.14 : 0.2)).rounded())
                 Text(status)
                     .font(StFont.body(13))
                     .foregroundStyle(Color.stTextPrimary.opacity(0.55))
@@ -124,7 +130,9 @@ private struct AlarmKitViewContent: View {
     @State private var openRecentID: LimitimerRecent.ID?
 
     var body: some View {
-        StAdaptiveToolLayout(tool: .timer, tag: "Timer") { size in
+        // The hero shows only while a timer runs or is paused (v0.4, iPhone).
+        let isActive = activeAlarm?.state == .countdown || activeAlarm?.state == .paused
+        StAdaptiveToolLayout(tool: .timer, tag: "Timer", showsHero: isActive) { size in
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let remaining = manager.remainingSeconds(at: context.date)
                 let total = manager.totalDuration ?? selectedDuration
@@ -214,10 +222,18 @@ private struct AlarmKitViewContent: View {
 
     private var durationPicker: some View {
         let timer = StTool.timer
+        // At 2 h, minutes and seconds lock at 0 (StTimer.maxDuration).
+        let isAtMaxHours = selectedHours == Int(StTimer.maxDuration) / 3_600
         return HStack(spacing: 0) {
-            picker(selection: $selectedHours, range: 0...23, label: "h")
-            picker(selection: $selectedMinutes, range: 0...59, label: "min")
-            picker(selection: $selectedSeconds, range: 0...59, label: "s")
+            picker(selection: $selectedHours, range: 0...(Int(StTimer.maxDuration) / 3_600), label: "Horas")
+            picker(selection: $selectedMinutes, range: isAtMaxHours ? 0...0 : 0...59, label: "Minutos")
+            picker(selection: $selectedSeconds, range: isAtMaxHours ? 0...0 : 0...59, label: "Segundos")
+        }
+        .onChange(of: isAtMaxHours) { _, isAtMax in
+            if isAtMax {
+                selectedMinutes = 0
+                selectedSeconds = 0
+            }
         }
         .frame(width: 312, height: 150)
         .background {
@@ -269,13 +285,6 @@ private struct AlarmKitViewContent: View {
         .labelsHidden()
         .frame(width: 104, height: 150)
         .clipped()
-        .overlay {
-            Text(label)
-                .font(StFont.body(15, .semibold))
-                .foregroundStyle(StTool.timer.tone)
-                .offset(x: label == "min" ? 34 : 26)
-                .allowsHitTesting(false)
-        }
     }
 
     // MARK: Controls
@@ -404,11 +413,12 @@ private struct AlarmKitViewContent: View {
         .overlay(shape.strokeBorder(.white.opacity(0.05), lineWidth: 1))
     }
 
-    /// Stopped: changes the set time (0…23:59:59). Running or paused: changes
-    /// the remaining time without stopping; reaching 0 resets the timer.
+    /// Stopped: changes the set time (0…2:00:00). Running or paused: changes
+    /// the remaining time without stopping, up to 2:00:00; reaching 0 resets
+    /// the timer.
     private func adjust(_ adjustment: TimerAdjustment) {
         guard let activeAlarm else {
-            applyDuration(min(86_399, max(0, Int(selectedDuration) + adjustment.seconds)))
+            applyDuration(Int(selectedDuration) + adjustment.seconds)
             return
         }
         guard activeAlarm.state != .alerting else { return }
@@ -432,14 +442,17 @@ private struct AlarmKitViewContent: View {
         }
     }
 
+    /// Sets the picker, clamped to 0…`StTimer.maxDuration`.
     private func applyDuration(_ seconds: Int) {
+        let seconds = min(Int(StTimer.maxDuration), max(0, seconds))
         selectedHours = seconds / 3_600
         selectedMinutes = (seconds % 3_600) / 60
         selectedSeconds = seconds % 60
     }
 
     private func startTimer(duration: TimeInterval? = nil, message: String? = nil) {
-        let timerDuration = duration ?? selectedDuration
+        // Recents saved before v0.4 may be longer than the limit.
+        let timerDuration = min(duration ?? selectedDuration, StTimer.maxDuration)
         guard timerDuration > 0 else { return }
 
         let endMessage = message ?? limitimerSettings.endMessage
@@ -594,7 +607,9 @@ private final class AlarmKitManager {
     func adjust(_ alarm: Alarm, by delta: TimeInterval) async {
         guard let remaining = remainingSeconds(at: .now) else { return }
         let total = totalDuration ?? remaining
-        let newRemaining = (remaining + delta).rounded(.up)
+        let newRemaining = min((remaining + delta).rounded(.up), StTimer.maxDuration)
+        // Already at the limit: nothing to reschedule.
+        guard newRemaining != remaining.rounded(.up) else { return }
         let wasPaused = alarm.state == .paused
         cancel(alarm)
         guard newRemaining > 0 else {
