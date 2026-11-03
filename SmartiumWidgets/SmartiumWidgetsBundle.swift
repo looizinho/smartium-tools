@@ -17,6 +17,7 @@ struct SmartiumWidgetsBundle: WidgetBundle {
         #endif
         #if canImport(AlarmKit) && os(iOS)
         SmartiumTimerLiveActivityWidget()
+        SmartiumTimerWidget()
         SmartiumTimerControl()
         #endif
         #if os(iOS)
