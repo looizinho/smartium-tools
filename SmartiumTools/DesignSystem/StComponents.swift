@@ -790,11 +790,11 @@ struct StTabItem<ID: Hashable>: Identifiable {
 
 /// Floating tab bar (v0.3): five visible slots, each 1/5 of the inner width.
 /// From the sixth item on it scrolls horizontally, and the active item is
-/// always scrolled to the center.
+/// always scrolled to the center. Icons only (v0.4): 58 pt bar, 48 pt pill;
+/// the tool name stays as the accessibility label.
 struct StTabBar<ID: Hashable>: View {
   private let items: [StTabItem<ID>]
   @Binding private var selection: ID
-  private let showsLabels: Bool
 
   /// Visible slots; more items scroll.
   static var visibleSlots: Int { 5 }
@@ -802,10 +802,9 @@ struct StTabBar<ID: Hashable>: View {
   @Namespace private var namespace
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-  init(_ items: [StTabItem<ID>], selection: Binding<ID>, showsLabels: Bool = true) {
+  init(_ items: [StTabItem<ID>], selection: Binding<ID>) {
     self.items = items
     self._selection = selection
-    self.showsLabels = showsLabels
   }
 
   var body: some View {
@@ -837,7 +836,7 @@ struct StTabBar<ID: Hashable>: View {
       }
     }
     .padding(5)
-    .frame(height: 68)
+    .frame(height: 58)
     .background {
       Capsule()
         .fill(StRGB(hex: 0x1C1923).color(opacity: 0.88))
@@ -856,17 +855,9 @@ struct StTabBar<ID: Hashable>: View {
         selection = item.id
       }
     } label: {
-      VStack(spacing: 3) {
-        Image(systemName: item.systemImage)
-          .font(StFont.body(20, .semibold))
-          .frame(height: 24)
-        if showsLabels {
-          Text(item.title)
-            .font(.stTabLabel)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-        }
-      }
+      Image(systemName: item.systemImage)
+        .font(StFont.body(20, .semibold))
+        .frame(height: 24)
       .foregroundStyle(isSelected ? Color.stInk900 : Color.stTextPrimary.opacity(0.7))
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .background {

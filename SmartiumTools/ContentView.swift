@@ -166,7 +166,7 @@ struct ContentView: View {
       .foregroundStyle(Color.stTextPrimary)
       .background { screenBackground }
       .safeAreaInset(edge: .bottom, spacing: 0) {
-        Color.clear.frame(height: layoutMode == .portrait ? 64 : 0)
+        Color.clear.frame(height: layoutMode == .portrait ? 54 : 0)
       }
       .toolbarVisibility(.hidden, for: .tabBar)
   }

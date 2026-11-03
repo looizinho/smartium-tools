@@ -269,7 +269,6 @@ extension Font {
 
     /// Use uppercase text and `.tracking(1.4)`.
     nonisolated static let stTag = StFont.body(11, .bold)
-    nonisolated static let stTabLabel = StFont.body(11, .bold)
 }
 
 // MARK: - Shadows
