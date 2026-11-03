@@ -44,6 +44,7 @@ enum ToolTab: String, Hashable, CaseIterable {
 
 struct ContentView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.scenePhase) private var scenePhase
   @State private var selectedTab: ToolTab = .orb
   private var settings = StSettingsStore.shared
 #if os(iOS)
@@ -66,6 +67,25 @@ struct ContentView: View {
   }
 
   var body: some View {
+    content
+      .onAppear(perform: openPendingTool)
+      .onReceive(NotificationCenter.default.publisher(for: .smartiumOpenToolRequested)) { _ in
+        openPendingTool()
+      }
+      .onChange(of: scenePhase) { _, phase in
+        if phase == .active { openPendingTool() }
+      }
+  }
+
+  /// Switches to the tab a control or widget asked for (v0.5).
+  private func openPendingTool() {
+    guard let destination = StLiveSurfaces.takePendingTool(),
+          let tab = ToolTab(rawValue: destination.rawValue) else { return }
+    selectedTab = tab
+  }
+
+  @ViewBuilder
+  private var content: some View {
 #if os(macOS)
     HStack(spacing: 0) {
       StSidebar(tabItems, selection: $selectedTab, tool: selectedTab.tool)

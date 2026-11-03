@@ -44,6 +44,7 @@ final class StMonitorModel {
 
   @ObservationIgnored private let live: StMetricsProvider = LiveMetricsProvider()
   @ObservationIgnored private let simulated: StMetricsProvider = SimulatedMetricsProvider()
+  @ObservationIgnored private var lastWidgetReload: Date?
 
   /// Samples until the task is cancelled. Restart it to change the interval.
   func run(interval: Double) async {
@@ -79,6 +80,22 @@ final class StMonitorModel {
     }
     if let value = pick(live.thermal(), simulated.thermal) { thermal = value }
     hasSample = true
+    publishSnapshot()
+  }
+
+  /// Saves the sample for the Monitor widgets and control (v0.5). Widgets
+  /// reload at most once a minute; their own timeline refreshes every 15 min.
+  private func publishSnapshot() {
+    StLiveSurfaces.metrics = StMetricsSnapshot(
+      cpu: cpu.value,
+      gpu: gpu.value,
+      memory: memory.value.fraction,
+      disk: disk.value.fraction,
+      updatedAt: .now
+    )
+    if let lastWidgetReload, Date.now.timeIntervalSince(lastWidgetReload) < 60 { return }
+    lastWidgetReload = .now
+    StLiveSurfaces.reloadMonitor()
   }
 
   private func appendCores(_ cores: [Double], isSimulated: Bool) {

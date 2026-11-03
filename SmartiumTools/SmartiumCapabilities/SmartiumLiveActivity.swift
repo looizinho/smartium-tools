@@ -115,6 +115,12 @@ public final class LiveActivityManager {
     /// Synchronizes `currentActivity` with ActivityKit's live list of active sessions.
     public func syncActiveActivity() {
         currentActivity = activeActivities.first
+        // The Orb control reads this flag from the App Group (v0.5).
+        let isActive = currentActivity != nil
+        if StLiveSurfaces.isOrbActivityActive != isActive {
+            StLiveSurfaces.isOrbActivityActive = isActive
+            StLiveSurfaces.reloadControl(StLiveSurfaces.ControlKind.orb)
+        }
     }
 
     private func observeActivities() {

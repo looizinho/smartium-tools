@@ -533,46 +533,15 @@ private final class AlarmKitManager {
         defer { isWorking = false }
 
         do {
-            authorizationState = try await AlarmManager.shared.requestAuthorization()
-            guard authorizationState == .authorized else {
-                lastErrorMessage = "O AlarmKit precisa estar autorizado para agendar timers."
-                return
-            }
-
-            let alertTitle = message.isEmpty ? LimitimerSettings.defaultEndMessage : message
-            let presentation = AlarmPresentation(
-                alert: .init(title: localizedTitle(alertTitle)),
-                countdown: .init(
-                    title: localizedTitle("Timer"),
-                    pauseButton: AlarmButton(
-                        text: "Pausar",
-                        textColor: tint,
-                        systemImageName: "pause.fill"
-                    )
-                ),
-                paused: .init(
-                    title: "Pausado",
-                    resumeButton: AlarmButton(
-                        text: "Retomar",
-                        textColor: tint,
-                        systemImageName: "play.fill"
-                    )
-                )
-            )
-            let attributes = AlarmAttributes<SmartiumAlarmMetadata>(
-                presentation: presentation,
-                metadata: SmartiumAlarmMetadata(tool: .timer),
-                tintColor: tint
-            )
-            let configuration = AlarmManager.AlarmConfiguration.timer(
+            try await StTimerService.schedule(
                 duration: duration,
-                attributes: attributes
+                message: message,
+                tint: tint,
+                startPaused: startPaused
             )
-
-            let id = UUID()
-            _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
-            if startPaused {
-                try AlarmManager.shared.pause(id: id)
+            // Adjustments pass `ringTotal`; only a fresh start sets what widgets restart with.
+            if ringTotal == nil {
+                StTimerService.recordStart(duration: duration, message: message)
             }
             scheduledDuration = duration
             ringTotalOverride = ringTotal
@@ -580,6 +549,7 @@ private final class AlarmKitManager {
             lastTint = tint
             refresh()
         } catch {
+            authorizationState = AlarmManager.shared.authorizationState
             lastErrorMessage = error.localizedDescription
         }
     }
@@ -649,6 +619,19 @@ private final class AlarmKitManager {
         presentationStates = Activity<AlarmAttributes<SmartiumAlarmMetadata>>
             .activities
             .compactMap { $0.content.state }
+        publishSnapshot()
+    }
+
+    /// Keeps the Timer widgets and control in step with this screen.
+    private func publishSnapshot() {
+        let alarm = alarms.first {
+            $0.state == .countdown || $0.state == .paused || $0.state == .alerting
+        }
+        StTimerService.publish(
+            state: alarm?.state,
+            remaining: remainingSeconds(at: .now),
+            total: totalDuration
+        )
     }
 
     private func observePresentationStates() {
@@ -742,10 +725,6 @@ private final class AlarmKitManager {
         }
 
         return nil
-    }
-
-    private func localizedTitle(_ text: String) -> LocalizedStringResource {
-        LocalizedStringResource(String.LocalizationValue(text))
     }
 
 }
