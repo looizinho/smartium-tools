@@ -101,6 +101,8 @@ nonisolated enum StTool: String, CaseIterable, Hashable, Sendable {
     case timer
     /// Âmbar. Staging tab, "attention" status and warnings.
     case fx
+    /// Sky. Monitor tab (v0.3).
+    case monitor
 
     var rgb: StRGB {
         switch self {
@@ -108,6 +110,7 @@ nonisolated enum StTool: String, CaseIterable, Hashable, Sendable {
         case .voice: StRGB(hex: 0xFF6B8A)
         case .timer: StRGB(hex: 0x3DDC9E)
         case .fx: StRGB(hex: 0xFFB547)
+        case .monitor: StAccent.sky
         }
     }
 
@@ -129,6 +132,7 @@ nonisolated enum StTool: String, CaseIterable, Hashable, Sendable {
         case .voice: StTool.fx.rgb
         case .timer: StAccent.sky
         case .fx: StTool.voice.rgb
+        case .monitor: StTool.orb.rgb
         }
     }
 
@@ -140,7 +144,8 @@ nonisolated enum StTool: String, CaseIterable, Hashable, Sendable {
         case .orb: "sparkles"
         case .voice: "waveform"
         case .timer: "timer"
-        case .fx: "laser.burst"
+        case .fx: "camera.metering.spot"
+        case .monitor: "gauge.with.needle"
         }
     }
 }
@@ -213,6 +218,19 @@ nonisolated enum StSpacing {
 
 // MARK: - Typography
 
+/// UI typography (v0.3): Nunito (OFL), embedded as one variable font that
+/// covers weights 400–800. No SF / `.rounded` text anywhere in the app.
+nonisolated enum StFont {
+    static let family = "Nunito"
+    /// PostScript name of `DigitalDotted-Mono.otf`. Only `StBigNumber` uses it.
+    static let numberFontName = "DigitalDottedFont-Regular"
+
+    /// UI text at a fixed size, for example `StFont.body(15, .semibold)`.
+    static func body(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        .custom(family, fixedSize: size).weight(weight)
+    }
+}
+
 extension Font {
     /// PostScript name of `Arial Rounded Bold.ttf` (registered via `UIAppFonts`).
     nonisolated static let stLogoFontName = "ArialRoundedMTBold"
@@ -224,20 +242,16 @@ extension Font {
 
     /// Card title (for example "Working…"). Pair with `.tracking(-0.3)`.
     nonisolated static func stDisplay(size: CGFloat = 30) -> Font {
-        .system(size: size, weight: .bold, design: .rounded)
+        StFont.body(size, .bold)
     }
-
-    nonisolated static let stTimer = Font.system(size: 64, weight: .medium, design: .rounded).monospacedDigit()
-    nonisolated static let stTitle = Font.system(size: 26, weight: .bold, design: .rounded)
 
     nonisolated static func stHeadline(size: CGFloat = 17) -> Font {
-        .system(size: size, weight: .semibold)
+        StFont.body(size, .semibold)
     }
 
-    nonisolated static let stBody = Font.system(size: 16)
     /// Use uppercase text and `.tracking(1.4)`.
-    nonisolated static let stTag = Font.system(size: 11, weight: .bold)
-    nonisolated static let stTabLabel = Font.system(size: 11, weight: .bold)
+    nonisolated static let stTag = StFont.body(11, .bold)
+    nonisolated static let stTabLabel = StFont.body(11, .bold)
 }
 
 // MARK: - Shadows

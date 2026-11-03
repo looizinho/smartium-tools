@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.dev.smartium.tests</string>
+		<string>group.dev.smartium.tools</string>
 	</array>
 </dict>
 </plist>

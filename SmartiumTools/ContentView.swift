@@ -7,12 +7,14 @@
 
 import SwiftUI
 
-/// The app's tools, in tab order, mapped to their design-system color.
-enum ToolTab: Hashable, CaseIterable {
+/// The app's tools, mapped to their design-system color. The raw value is the
+/// ID in `settings.json` `tabOrder`; `allCases` is the default order.
+enum ToolTab: String, Hashable, CaseIterable {
   case orb
   case voice
   case timer
   case staging
+  case monitor
 
   var tool: StTool {
     switch self {
@@ -20,6 +22,7 @@ enum ToolTab: Hashable, CaseIterable {
     case .voice: .voice
     case .timer: .timer
     case .staging: .fx
+    case .monitor: .monitor
     }
   }
 
@@ -30,6 +33,7 @@ enum ToolTab: Hashable, CaseIterable {
     case .voice: "Voz"
     case .timer: "Timer"
     case .staging: "Staging"
+    case .monitor: "Monitor"
     }
   }
 
@@ -41,6 +45,7 @@ enum ToolTab: Hashable, CaseIterable {
 struct ContentView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var selectedTab: ToolTab = .orb
+  private var settings = StSettingsStore.shared
 #if os(iOS)
   @Environment(\.verticalSizeClass) private var verticalSizeClass
 #endif
@@ -55,10 +60,15 @@ struct ContentView: View {
 #endif
   }
 
+  /// Tab bar, dock and sidebar order, from `settings.json`.
+  private var tabItems: [StTabItem<ToolTab>] {
+    settings.ordered(ToolTab.allCases, id: \.rawValue).map(\.tabItem)
+  }
+
   var body: some View {
 #if os(macOS)
     HStack(spacing: 0) {
-      StSidebar(ToolTab.allCases.map(\.tabItem), selection: $selectedTab, tool: selectedTab.tool)
+      StSidebar(tabItems, selection: $selectedTab, tool: selectedTab.tool)
 
       Group {
         switch selectedTab {
@@ -66,6 +76,7 @@ struct ContentView: View {
         case .voice: VoiceRingView()
         case .timer: AlarmKitView()
         case .staging: StagingView()
+        case .monitor: MonitorView()
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -93,12 +104,16 @@ struct ContentView: View {
       Tab(value: ToolTab.staging) {
         tabScreen { StagingView() }
       }
+
+      Tab(value: ToolTab.monitor) {
+        tabScreen { MonitorView() }
+      }
     }
     .tint(selectedTab.tool.tone)
     .environment(\.stLayoutMode, layoutMode)
     .overlay(alignment: .bottom) {
       if layoutMode == .portrait {
-        StTabBar(ToolTab.allCases.map(\.tabItem), selection: $selectedTab)
+        StTabBar(tabItems, selection: $selectedTab)
           .ignoresSafeArea(edges: .bottom)
           .transition(.opacity)
       }
@@ -106,7 +121,7 @@ struct ContentView: View {
     .overlay(alignment: .bottomLeading) {
       if layoutMode == .landscape {
         // Collapsed dock: safe area + 2 from the left, 16 from the bottom edge.
-        StDock(ToolTab.allCases.map(\.tabItem), selection: $selectedTab)
+        StDock(tabItems, selection: $selectedTab)
           .padding(.leading, 2)
           .padding(.bottom, 16)
           .ignoresSafeArea(edges: .bottom)
@@ -445,7 +460,7 @@ struct StagingPlaceholder: View {
     let shape = RoundedRectangle(cornerRadius: StRadius.card, style: .continuous)
     VStack(spacing: 12) {
       Image(systemName: "camera.fill")
-        .font(.system(size: 30, weight: .medium))
+        .font(StFont.body(30, .medium))
         .foregroundStyle(fx.tone)
         .frame(width: 72, height: 72)
         .background(Circle().fill(fx.opacity(0.16)))
@@ -453,9 +468,9 @@ struct StagingPlaceholder: View {
         .accessibilityHidden(true)
 
       Text(title)
-        .font(.system(size: 20, weight: .bold, design: .rounded))
+        .font(StFont.body(20, .bold))
       Text(message)
-        .font(.system(size: 14))
+        .font(StFont.body(14))
         .foregroundStyle(Color.stTextPrimary.opacity(0.6))
         .frame(maxWidth: 240)
     }

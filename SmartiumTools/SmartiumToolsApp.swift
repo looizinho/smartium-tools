@@ -6,12 +6,10 @@
 //
 
 import SwiftUI
-import WidgetKit
 
 @main
 struct SmartiumToolsApp: App {
     @Environment(\.scenePhase) private var scenePhase
-    @State private var appearance = AppearanceSettings.load()
 
     var body: some Scene {
         WindowGroup {
@@ -19,14 +17,13 @@ struct SmartiumToolsApp: App {
                 #if os(macOS)
                 .toolbar(removing: .title)
                 #endif
-                .environment(\.smartiumAppearance, appearance)
+                // Default text font (v0.3): views without an explicit font use Nunito.
+                .font(StFont.body(17))
                 #if os(iOS)
-                // The design is dark-only. The iCloud theme still applies to widgets and Live Activity.
+                // The design is dark-only.
                 .preferredColorScheme(.dark)
-                #else
-                .preferredColorScheme(appearance.colorScheme)
                 #endif
-                .tint(appearance.accentColor)
+                .tint(.purple)
                 .task {
                     _ = await ICloudSettings.loadLimitimer()
                 }
@@ -34,14 +31,7 @@ struct SmartiumToolsApp: App {
                     guard scenePhase == .active else { return }
                     await ICloudSettings.prepareTestFile()
                     _ = await ICloudSettings.loadLimitimer()
-                    guard let loaded = await ICloudSettings.loadAppearance(), !Task.isCancelled,
-                          loaded != appearance else { return }
-                    appearance = loaded
-                    loaded.save()
-                    WidgetCenter.shared.reloadAllTimelines()
-                    #if canImport(ActivityKit) && os(iOS)
-                    await LiveActivityManager.shared.refreshAppearance()
-                    #endif
+                    await StSettingsStore.shared.syncWithICloud()
                 }
         }
         #if os(macOS)

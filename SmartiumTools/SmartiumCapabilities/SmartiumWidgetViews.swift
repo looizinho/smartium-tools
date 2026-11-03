@@ -54,7 +54,6 @@ nonisolated public struct SmartiumOrbTimelineProvider: TimelineProvider {
 
 public struct SmartiumOrbWidgetEntryView: View {
     public let entry: SmartiumOrbTimelineEntry
-    @Environment(\.smartiumAppearance) private var appearance
     @Environment(\.widgetFamily) private var family
     @Environment(\.colorScheme) private var colorScheme
 
@@ -62,12 +61,12 @@ public struct SmartiumOrbWidgetEntryView: View {
         self.entry = entry
     }
 
-    /// Widgets take the color of their tool's screen, not `accent-color`.
+    /// Widgets take the color of their tool's screen.
     /// The only widget today is the Orb's, so it is Íris.
     private let tone = StTool.orb.tone
 
     private var isDark: Bool {
-        (appearance.colorScheme ?? colorScheme) == .dark
+        colorScheme == .dark
     }
 
     private var primaryTextColor: Color {
@@ -119,12 +118,12 @@ public struct SmartiumOrbWidgetEntryView: View {
         VStack(spacing: 8) {
             HStack {
                 Text("Smartium")
-                    .font(.caption2.bold())
+                    .font(StFont.body(11, .bold))
                     .foregroundStyle(secondaryTextColor)
                 Spacer()
                 Button(intent: CycleOrbStateIntent()) {
                     Image(systemName: "arrow.trianglehead.2.clockwise")
-                        .font(.caption2.weight(.bold))
+                        .font(StFont.body(11, .bold))
                         .foregroundStyle(.white)
                         .frame(width: 24, height: 24)
                         .background(Circle().fill(tone))
@@ -138,13 +137,13 @@ public struct SmartiumOrbWidgetEntryView: View {
             ThinkingOrb(
                 state: entry.sharedState.orbState,
                 size: .px64,
-                theme: appearance.orbTheme,
+                theme: .auto,
                 displaySize: 68
             )
             .orbFrozenTime(frozenInstant)
 
             Text(entry.sharedState.orbState.label)
-                .font(.caption.weight(.semibold))
+                .font(StFont.body(12, .semibold))
                 .foregroundStyle(primaryTextColor)
                 .lineLimit(1)
         }
@@ -155,7 +154,7 @@ public struct SmartiumOrbWidgetEntryView: View {
             ThinkingOrb(
                 state: entry.sharedState.orbState,
                 size: .px64,
-                theme: appearance.orbTheme,
+                theme: .auto,
                 displaySize: 84
             )
             .orbFrozenTime(frozenInstant)
@@ -170,12 +169,12 @@ public struct SmartiumOrbWidgetEntryView: View {
                     Image(systemName: "sparkles")
                         .foregroundStyle(tone)
                     Text(entry.sharedState.activeToolName)
-                        .font(.caption.weight(.semibold))
+                        .font(StFont.body(12, .semibold))
                         .foregroundStyle(tone)
                 }
 
                 Text(entry.sharedState.orbState.label)
-                    .font(.headline)
+                    .font(StFont.body(17, .semibold))
                     .foregroundStyle(primaryTextColor)
 
                 if let progress = entry.sharedState.stepProgress {
@@ -183,7 +182,7 @@ public struct SmartiumOrbWidgetEntryView: View {
                         .tint(tone)
                 } else {
                     Text("Toque no botão para alternar o estado.")
-                        .font(.caption2)
+                        .font(StFont.body(11))
                         .foregroundStyle(secondaryTextColor)
                         .lineLimit(2)
                 }
@@ -192,7 +191,7 @@ public struct SmartiumOrbWidgetEntryView: View {
 
                 Button(intent: CycleOrbStateIntent()) {
                     Label("Próximo Estado", systemImage: "arrow.trianglehead.2.clockwise")
-                        .font(.caption2.weight(.semibold))
+                        .font(StFont.body(11, .semibold))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(Capsule().fill(tone.opacity(isDark ? 0.85 : 0.90)))
@@ -213,10 +212,7 @@ public struct SmartiumOrbWidget: Widget {
 
     public var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: SmartiumOrbTimelineProvider()) { entry in
-            let appearance = AppearanceSettings.load()
             SmartiumOrbWidgetEntryView(entry: entry)
-                .environment(\.smartiumAppearance, appearance)
-                .preferredColorScheme(appearance.colorScheme)
                 .tint(StTool.orb.tone)
         }
         .configurationDisplayName("Smartium Orb")
@@ -234,7 +230,6 @@ import ActivityKit
 public struct SmartiumLockScreenBannerView: View {
     public let toolTitle: String
     public let state: SmartiumActivityAttributes.ContentState
-    @Environment(\.smartiumAppearance) private var appearance
     public let isStale: Bool
     @Environment(\.colorScheme) private var colorScheme
 
@@ -244,11 +239,11 @@ public struct SmartiumLockScreenBannerView: View {
         self.isStale = isStale
     }
 
-    /// Live Activity color comes from the owning tool, not `accent-color` (v0.2).
+    /// Live Activity color comes from the owning tool (v0.2).
     private var tone: Color { state.tool.tone }
 
     private var isDark: Bool {
-        (appearance.colorScheme ?? colorScheme) == .dark
+        colorScheme == .dark
     }
 
     private var primaryTextColor: Color {
@@ -269,7 +264,7 @@ public struct SmartiumLockScreenBannerView: View {
             ThinkingOrb(
                 state: state.orbState,
                 size: .px64,
-                theme: appearance.orbTheme,
+                theme: .auto,
                 displaySize: 52
             )
             .orbFrozenTime(frozenInstant)
@@ -279,15 +274,15 @@ public struct SmartiumLockScreenBannerView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
-                        .font(.caption)
+                        .font(StFont.body(12))
                         .foregroundStyle(tone)
                     Text(toolTitle)
-                        .font(.caption.weight(.semibold))
+                        .font(StFont.body(12, .semibold))
                         .foregroundStyle(secondaryTextColor)
                 }
 
                 Text(state.statusText)
-                    .font(.subheadline.weight(.bold))
+                    .font(StFont.body(15, .bold))
                     .foregroundStyle(primaryTextColor)
                     .contentTransition(.numericText())
 
@@ -301,7 +296,7 @@ public struct SmartiumLockScreenBannerView: View {
 
             Button(intent: CycleOrbStateIntent()) {
                 Image(systemName: "arrow.trianglehead.2.clockwise")
-                    .font(.subheadline.weight(.semibold))
+                    .font(StFont.body(15, .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 34, height: 34)
                     .background(Circle().fill(tone))
@@ -336,7 +331,7 @@ struct SmartiumLiveActivityIcon: View {
 
     var body: some View {
         Image(systemName: tool.systemImage)
-            .font(.system(size: 14, weight: .semibold))
+            .font(StFont.body(14, .semibold))
             .foregroundStyle(tool.tone)
             .frame(width: 22, height: 22)
             .background(Circle().fill(tool.opacity(0.22)))
@@ -349,15 +344,12 @@ public struct SmartiumLiveActivityWidget: Widget {
 
     public var body: some WidgetConfiguration {
         ActivityConfiguration(for: SmartiumActivityAttributes.self) { context in
-            let appearance = context.state.appearance ?? AppearanceSettings.load()
             let tone = context.state.tool.tone
             SmartiumLockScreenBannerView(
                 toolTitle: context.attributes.toolTitle,
                 state: context.state,
                 isStale: context.isStale
             )
-            .environment(\.smartiumAppearance, appearance)
-            .preferredColorScheme(appearance.colorScheme)
             .activitySystemActionForegroundColor(tone)
         } dynamicIsland: { context in
             let tool = context.state.tool
@@ -385,10 +377,10 @@ public struct SmartiumLiveActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.trailing) {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(context.attributes.toolTitle)
-                            .font(.caption2.weight(.semibold))
+                            .font(StFont.body(11, .semibold))
                             .foregroundStyle(tone)
                         Text(context.state.statusText)
-                            .font(.caption.weight(.bold))
+                            .font(StFont.body(12, .bold))
                             .foregroundStyle(.white)
                             .contentTransition(.numericText())
                     }
@@ -399,7 +391,7 @@ public struct SmartiumLiveActivityWidget: Widget {
                     HStack(spacing: 10) {
                         Button(intent: CycleOrbStateIntent()) {
                             Label("Próximo Estado", systemImage: "sparkles")
-                                .font(.caption.weight(.semibold))
+                                .font(StFont.body(12, .semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 6)
                                 .background(Capsule().fill(tone.opacity(0.85)))
@@ -409,7 +401,7 @@ public struct SmartiumLiveActivityWidget: Widget {
 
                         Button(intent: StopLiveActivityIntent()) {
                             Image(systemName: "xmark")
-                                .font(.caption.weight(.bold))
+                                .font(StFont.body(12, .bold))
                                 .padding(8)
                                 .background(Circle().fill(.white.opacity(0.15)))
                                 .foregroundStyle(.white)
@@ -423,7 +415,7 @@ public struct SmartiumLiveActivityWidget: Widget {
                 SmartiumLiveActivityIcon(tool: tool)
             } compactTrailing: {
                 Text(orbState.label)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(StFont.body(13, .semibold))
                     .monospacedDigit()
                     .foregroundStyle(tone)
                     .lineLimit(1)

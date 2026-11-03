@@ -8,58 +8,25 @@ import OSLog
 
 enum ICloudSettings {
     nonisolated private struct Document: Codable {
-        let appearance: AppearanceSettings?
         var limitimer: LimitimerSettings?
     }
+
+    /// Keys the app no longer uses; writes remove them from settings.json.
+    nonisolated private static let obsoleteKeys = ["appearance"]
 
     nonisolated private struct LegacyRecentTimer: Decodable {
         let duration: TimeInterval
         let label: String?
     }
 
-    nonisolated static func loadAppearance() async -> AppearanceSettings? {
-        await Task.detached(priority: .utility) {
-            let manager = FileManager.default
-            guard let container = manager.url(forUbiquityContainerIdentifier: "iCloud.dev.smartium.tests") else {
-                return nil
-            }
-            let url = container.appendingPathComponent("Documents/settings.json")
-            // Download on demand when the file exists only in iCloud.
-            if manager.isUbiquitousItem(at: url) {
-                try? manager.startDownloadingUbiquitousItem(at: url)
-            }
-            for attempt in 0..<3 {
-                var coordinationError: NSError?
-                var result: AppearanceSettings?
-                var readError: Error?
-                NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readableURL in
-                    do {
-                        let data = try Data(contentsOf: readableURL)
-                        result = data.isEmpty ? AppearanceSettings() : try JSONDecoder().decode(Document.self, from: data).appearance ?? AppearanceSettings()
-                    } catch {
-                        readError = error
-                    }
-                }
-                if let result { return result }
-                if attempt == 2, let error = coordinationError ?? readError {
-                    Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
-                        .error("Falha ao ler aparência: \(error.localizedDescription, privacy: .public)")
-                } else {
-                    try? await Task.sleep(for: .seconds(1))
-                }
-            }
-            return nil
-        }.value
-    }
-
     nonisolated static func prepareTestFile() async {
         // Container lookup and coordinated disk access must run off the main thread.
         await Task.detached(priority: .utility) {
-            let logger = Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
+            let logger = Logger(subsystem: "dev.smartium.tools", category: "iCloudSettings")
             let fileManager = FileManager.default
 
             guard let containerURL = fileManager.url(
-                forUbiquityContainerIdentifier: "iCloud.dev.smartium.tests"
+                forUbiquityContainerIdentifier: "iCloud.dev.smartium.tools"
             ) else {
                 logger.notice("iCloud indisponível. Verifique a conta e o iCloud Drive; tente abrir o app novamente.")
                 return
@@ -104,7 +71,7 @@ enum ICloudSettings {
 
     nonisolated static func loadLimitimer() async -> LimitimerSettings {
         await Task.detached(priority: .utility) {
-            let logger = Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
+            let logger = Logger(subsystem: "dev.smartium.tools", category: "iCloudSettings")
             let (document, readError) = readDocument()
 
             if let limitimer = document?.limitimer {
@@ -132,51 +99,118 @@ enum ICloudSettings {
 
     nonisolated static func saveLimitimer(_ settings: LimitimerSettings) async {
         await Task.detached(priority: .utility) {
-            let (document, readError) = readDocument()
-            guard readError == nil else {
-                Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
-                    .error("Não foi possível atualizar Limitimer: \(readError?.localizedDescription ?? "desconhecido", privacy: .public)")
-                return
-            }
-
-            var updatedDocument = document ?? Document(appearance: nil, limitimer: nil)
-            updatedDocument.limitimer = settings
-
-            guard let containerURL = FileManager.default.url(
-                forUbiquityContainerIdentifier: "iCloud.dev.smartium.tests"
-            ) else {
-                Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
-                    .notice("iCloud indisponível; Limitimer não foi salvo em settings.json.")
-                return
-            }
-
-            let settingsURL = containerURL.appendingPathComponent("Documents/settings.json")
-            let coordinator = NSFileCoordinator(filePresenter: nil)
-            var coordinationError: NSError?
-            var writeError: Error?
-
-            coordinator.coordinate(writingItemAt: settingsURL, options: [], error: &coordinationError) { writableURL in
-                do {
-                    let encoder = JSONEncoder()
-                    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                    let data = try encoder.encode(updatedDocument)
-                    try data.write(to: writableURL)
-                } catch {
-                    writeError = error
-                }
-            }
-
-            if let error = coordinationError ?? writeError {
-                Logger(subsystem: "dev.smartium.tests", category: "iCloudSettings")
-                    .error("Falha ao salvar Limitimer: \(error.localizedDescription, privacy: .public)")
-            }
+            writeKeys(["limitimer": settings], label: "Limitimer")
         }.value
     }
 
+    /// App preferences (`tabOrder`, `monitor`) as read from settings.json.
+    nonisolated enum AppSettingsRead: Sendable {
+        /// iCloud is off, or the file couldn't be read or decoded.
+        case unavailable
+        /// The file has neither key yet, e.g. on the first device to sync.
+        case absent
+        case found(StSettings)
+    }
+
+    nonisolated static func loadAppSettings() async -> AppSettingsRead {
+        await Task.detached(priority: .utility) {
+            let (data, readError) = readData()
+            guard let data else {
+                if let readError {
+                    Logger(subsystem: "dev.smartium.tools", category: "iCloudSettings")
+                        .error("Falha ao ler ajustes: \(readError.localizedDescription, privacy: .public)")
+                }
+                return .unavailable
+            }
+            guard !data.isEmpty else { return .absent }
+            guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return .unavailable
+            }
+            guard object["tabOrder"] != nil || object["monitor"] != nil else { return .absent }
+            guard let settings = try? JSONDecoder().decode(StSettings.self, from: data) else {
+                return .unavailable
+            }
+            return .found(settings)
+        }.value
+    }
+
+    nonisolated static func saveAppSettings(_ settings: StSettings) async {
+        await Task.detached(priority: .utility) {
+            writeKeys(["tabOrder": settings.tabOrder, "monitor": settings.monitor], label: "ajustes")
+        }.value
+    }
+
+    /// Replaces only `values`' top-level keys and keeps every other key in
+    /// settings.json, including keys edited by hand (except `obsoleteKeys`). Skips the write when the
+    /// file can't be read, so a sync problem never overwrites the user's file.
+    nonisolated private static func writeKeys(_ values: [String: any Encodable], label: String) {
+        let logger = Logger(subsystem: "dev.smartium.tools", category: "iCloudSettings")
+        guard let containerURL = FileManager.default.url(
+            forUbiquityContainerIdentifier: "iCloud.dev.smartium.tools"
+        ) else {
+            logger.notice("iCloud indisponível; \(label, privacy: .public) não foi salvo em settings.json.")
+            return
+        }
+
+        // Also downloads the file when it exists only in iCloud.
+        let (_, readError) = readData()
+        if let readError {
+            logger.error("Não foi possível atualizar \(label, privacy: .public): \(readError.localizedDescription, privacy: .public)")
+            return
+        }
+
+        let settingsURL = containerURL.appendingPathComponent("Documents/settings.json")
+        var coordinationError: NSError?
+        var writeError: Error?
+
+        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: settingsURL, options: [], error: &coordinationError) { writableURL in
+            do {
+                var object: [String: Any] = [:]
+                if let data = try? Data(contentsOf: writableURL), !data.isEmpty {
+                    guard let existing = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                        throw CocoaError(.fileReadCorruptFile)
+                    }
+                    object = existing
+                }
+                for key in obsoleteKeys {
+                    object[key] = nil
+                }
+                for (key, value) in values {
+                    let encoded = try JSONEncoder().encode(value)
+                    object[key] = try JSONSerialization.jsonObject(with: encoded, options: .fragmentsAllowed)
+                }
+                let data = try JSONSerialization.data(
+                    withJSONObject: object,
+                    options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+                )
+                try data.write(to: writableURL)
+            } catch {
+                writeError = error
+            }
+        }
+
+        if let error = coordinationError ?? writeError {
+            logger.error("Falha ao salvar \(label, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     nonisolated private static func readDocument() -> (Document?, Error?) {
+        let (data, readError) = readData()
+        guard let data else { return (nil, readError) }
+        guard !data.isEmpty else { return (Document(limitimer: nil), nil) }
+        do {
+            return (try JSONDecoder().decode(Document.self, from: data), nil)
+        } catch {
+            return (nil, error)
+        }
+    }
+
+    /// The raw settings.json, retried while iCloud downloads it.
+    /// `(nil, nil)` when iCloud is unavailable.
+    nonisolated private static func readData() -> (Data?, Error?) {
         let fileManager = FileManager.default
         guard let containerURL = fileManager.url(
-            forUbiquityContainerIdentifier: "iCloud.dev.smartium.tests"
+            forUbiquityContainerIdentifier: "iCloud.dev.smartium.tools"
         ) else {
             return (nil, nil)
         }
@@ -188,13 +222,12 @@ enum ICloudSettings {
 
         for attempt in 0..<3 {
             var coordinationError: NSError?
-            var result: Document?
+            var result: Data?
             var readError: Error?
 
             NSFileCoordinator().coordinate(readingItemAt: settingsURL, options: [], error: &coordinationError) { readableURL in
                 do {
-                    let data = try Data(contentsOf: readableURL)
-                    result = data.isEmpty ? Document(appearance: nil, limitimer: nil) : try JSONDecoder().decode(Document.self, from: data)
+                    result = try Data(contentsOf: readableURL)
                 } catch {
                     readError = error
                 }

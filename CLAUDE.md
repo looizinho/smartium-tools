@@ -46,7 +46,7 @@ A pure-math engine plus a SwiftUI renderer, ported from the TypeScript `thinking
 - The parity rule from `AGENTS.md` applies: change formulas only by transcribing the TS source verbatim, and use `Double` throughout.
 
 ### SmartiumCapabilities (shared app ↔ widget state)
-- `ToolSharedState` (`SmartiumSharedState.swift`) is the single source of truth. It's stored as JSON in `UserDefaults(suiteName: "group.dev.smartium.tests")`, and `save()` reloads all WidgetKit timelines. Changes are announced in-process through `Notification.Name.smartiumOrbStateDidChange`. `ContentView` re-reads state on appear, on that notification, and when the scene becomes active.
+- `ToolSharedState` (`SmartiumSharedState.swift`) is the single source of truth. It's stored as JSON in `UserDefaults(suiteName: "group.dev.smartium.tools")`, and `save()` reloads all WidgetKit timelines. Changes are announced in-process through `Notification.Name.smartiumOrbStateDidChange`. `ContentView` re-reads state on appear, on that notification, and when the scene becomes active.
 - `CycleOrbStateIntent` advances the orb state from widgets and Live Activities. On iOS it's a `LiveActivityIntent` (runs in the app process); elsewhere it's a plain `AppIntent`.
 - `SmartiumLiveActivity.swift`: `SmartiumActivityAttributes` and an `@Observable` `LiveActivityManager.shared` (start/toggle/update/sync), plus `StopLiveActivityIntent`.
 - `SmartiumWidgetViews.swift`: `SmartiumOrbWidget` (Home Screen) and `SmartiumLiveActivityWidget` (Lock Screen / Dynamic Island). `SmartiumWidgetsBundle` registers them.
@@ -55,4 +55,4 @@ A pure-math engine plus a SwiftUI renderer, ported from the TypeScript `thinking
 ### App UI
 `ContentView` uses a `TabView` on iOS and a custom toolbar pill switcher on macOS (`#if os(macOS)`). `ThinkingOrbsView` cycles states on tap and writes them to shared state and the Live Activity. `VoiceRingView` is a placeholder. Some UI strings are in Portuguese ("Ativar na Ilha Dinâmica").
 
-The App Group `group.dev.smartium.tests` (and the app's iCloud container) must stay identical across both entitlements files and `ToolSharedState.appGroupIdentifier`.
+The App Group `group.dev.smartium.tools` (and the app's iCloud container) must stay identical across both entitlements files and `ToolSharedState.appGroupIdentifier`.

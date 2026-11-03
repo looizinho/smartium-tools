@@ -57,7 +57,7 @@ struct StButton: View {
           .overlay(Capsule().strokeBorder(tool.opacity(0.35), lineWidth: 1))
       case .iconTinted(let tool):
         Image(systemName: systemImage)
-          .font(.system(size: 18, weight: .semibold))
+          .font(StFont.body(18, .semibold))
           .foregroundStyle(tool.tone)
           .frame(width: 56, height: 56)
           .background(Circle().fill(tool.opacity(0.14)))
@@ -65,7 +65,7 @@ struct StButton: View {
           .contentShape(Circle())
       case .icon:
         Image(systemName: systemImage)
-          .font(.system(size: 18, weight: .semibold))
+          .font(StFont.body(18, .semibold))
           .foregroundStyle(Color.stTextPrimary)
           .frame(width: 56, height: 56)
           .background(Circle().fill(Color.stInk600))
@@ -92,7 +92,7 @@ struct StButton: View {
       }
       Spacer(minLength: 8)
       Image(systemName: systemImage)
-        .font(.system(size: 16, weight: .bold))
+        .font(StFont.body(16, .bold))
         .foregroundStyle(icon)
         .frame(width: 44, height: 44)
         .background(Circle().fill(puckFill))
@@ -178,7 +178,7 @@ struct StIconTile: View {
   
   var body: some View {
     Image(systemName: systemImage)
-      .font(.system(size: size * 0.48, weight: .semibold))
+      .font(StFont.body(size * 0.48, .semibold))
       .foregroundStyle(tool.tone)
       .frame(width: size, height: size)
       .background(
@@ -216,7 +216,7 @@ struct StRow<Content: View>: View {
       content
       if showsChevron {
         Image(systemName: "chevron.right")
-          .font(.system(size: 14, weight: .semibold))
+          .font(StFont.body(14, .semibold))
           .foregroundStyle(Color.stTextQuaternary)
       }
     }
@@ -246,13 +246,13 @@ struct StRowText: View {
   var body: some View {
     HStack(spacing: 8) {
       Text(title)
-        .font(.system(size: 17, weight: .medium))
+        .font(StFont.body(17, .medium))
         .foregroundStyle(Color.stTextPrimary)
         .lineLimit(1)
       Spacer(minLength: 8)
       if let value {
         Text(value)
-          .font(.system(size: 15))
+          .font(StFont.body(15))
           .monospacedDigit()
           .foregroundStyle(Color.stTextTertiary)
           .lineLimit(1)
@@ -341,7 +341,7 @@ struct StSegment<Item: Hashable>: View {
         }
       } label: {
         Text(title(item))
-          .font(.system(size: 14, weight: .semibold))
+          .font(StFont.body(14, .semibold))
           .lineLimit(1)
           .foregroundStyle(isSelected ? tool.light : Color.stTextSecondary)
           .padding(.horizontal, 14)
@@ -596,7 +596,7 @@ struct StToolHeader: View {
     let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
     HStack(spacing: 14) {
       Image(systemName: tool.systemImage)
-        .font(.system(size: 24, weight: .semibold))
+        .font(StFont.body(24, .semibold))
         .foregroundStyle(tool.tone)
         .frame(width: 54, height: 54)
         .background(Circle().fill(tool.opacity(0.20)))
@@ -607,10 +607,10 @@ struct StToolHeader: View {
       VStack(alignment: .leading, spacing: 3) {
         HStack(spacing: 8) {
           Text(title)
-            .font(.system(size: 24, weight: .bold, design: .rounded))
+            .font(StFont.body(24, .bold))
             .foregroundStyle(Color.stTextPrimary)
           Image(systemName: "sparkles")
-            .font(.system(size: 16, weight: .semibold))
+            .font(StFont.body(16, .semibold))
             .foregroundStyle(tool.secondary)
             .accessibilityHidden(true)
         }
@@ -619,7 +619,7 @@ struct StToolHeader: View {
             .fill(status.color)
             .frame(width: 7, height: 7)
           Text(subtitle)
-            .font(.system(size: 14))
+            .font(StFont.body(14))
             .foregroundStyle(Color.stTextPrimary.opacity(0.65))
             .lineLimit(1)
             .truncationMode(.tail)
@@ -666,7 +666,7 @@ struct StChip: View {
           .frame(width: 9, height: 9)
           .shadow(color: color.color, radius: 4)
         Text(title)
-          .font(.system(size: 15, weight: .semibold))
+          .font(StFont.body(15, .semibold))
           .lineLimit(1)
           .foregroundStyle(Color.stTextPrimary.opacity(isOn ? 1 : 0.78))
       }
@@ -695,7 +695,7 @@ struct StSectionLabel: View {
         .fill(dot)
         .frame(width: 6, height: 6)
       Text(title.uppercased())
-        .font(.system(size: 12, weight: .bold))
+        .font(StFont.body(12, .bold))
         .tracking(1.3)
         .foregroundStyle(Color.stTextPrimary.opacity(0.55))
     }
@@ -788,24 +788,52 @@ struct StTabItem<ID: Hashable>: Identifiable {
   let tool: StTool
 }
 
+/// Floating tab bar (v0.3): five visible slots, each 1/5 of the inner width.
+/// From the sixth item on it scrolls horizontally, and the active item is
+/// always scrolled to the center.
 struct StTabBar<ID: Hashable>: View {
   private let items: [StTabItem<ID>]
   @Binding private var selection: ID
   private let showsLabels: Bool
-  
+
+  /// Visible slots; more items scroll.
+  static var visibleSlots: Int { 5 }
+
   @Namespace private var namespace
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  
+
   init(_ items: [StTabItem<ID>], selection: Binding<ID>, showsLabels: Bool = true) {
     self.items = items
     self._selection = selection
     self.showsLabels = showsLabels
   }
-  
+
   var body: some View {
-    HStack(spacing: 0) {
-      ForEach(items) { item in
-        tabButton(item)
+    GeometryReader { proxy in
+      let itemWidth = proxy.size.width / CGFloat(Self.visibleSlots)
+      ScrollViewReader { reader in
+        ScrollView(.horizontal) {
+          HStack(spacing: 0) {
+            ForEach(items) { item in
+              tabButton(item)
+                .frame(width: itemWidth)
+                .id(item.id)
+            }
+          }
+          .scrollTargetLayout()
+        }
+        .scrollIndicators(.hidden)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollDisabled(items.count <= Self.visibleSlots)
+        .clipShape(Capsule())
+        .onAppear {
+          reader.scrollTo(selection, anchor: .center)
+        }
+        .onChange(of: selection) { _, newValue in
+          withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.35)) {
+            reader.scrollTo(newValue, anchor: .center)
+          }
+        }
       }
     }
     .padding(5)
@@ -820,7 +848,7 @@ struct StTabBar<ID: Hashable>: View {
     .padding(.horizontal, 18)
     .padding(.bottom, 22)
   }
-  
+
   private func tabButton(_ item: StTabItem<ID>) -> some View {
     let isSelected = item.id == selection
     return Button {
@@ -830,18 +858,20 @@ struct StTabBar<ID: Hashable>: View {
     } label: {
       VStack(spacing: 3) {
         Image(systemName: item.systemImage)
-          .font(.system(size: 20, weight: .semibold))
+          .font(StFont.body(20, .semibold))
           .frame(height: 24)
         if showsLabels {
           Text(item.title)
             .font(.stTabLabel)
             .lineLimit(1)
+            .minimumScaleFactor(0.8)
         }
       }
       .foregroundStyle(isSelected ? Color.stInk900 : Color.stTextPrimary.opacity(0.7))
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .background {
         if isSelected {
+          // The pill lives inside the scrolling content, so it scrolls with it.
           Capsule()
             .fill(item.tool.tone)
             .matchedGeometryEffect(id: "pill", in: namespace)
@@ -894,7 +924,7 @@ struct StTabBar<ID: Hashable>: View {
         }
         StHalo(.orb) {
           Image(systemName: "sparkles")
-            .font(.system(size: 64))
+            .font(StFont.body(64))
             .foregroundStyle(StTool.orb.tone)
         }
         .frame(maxWidth: .infinity)

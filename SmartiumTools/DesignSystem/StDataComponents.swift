@@ -40,7 +40,7 @@ struct StRing: View {
                 .rotationEffect(.degrees(-90))
                 .padding(size.lineWidth / 2)
             Text("\(Int((fraction * 100).rounded()))%")
-                .font(.system(size: size.fontSize, weight: .bold, design: .rounded))
+                .font(StFont.body(size.fontSize, .bold))
                 .monospacedDigit()
                 .foregroundStyle(status.tone)
         }
@@ -137,15 +137,15 @@ struct StMetricTile: View {
                 StIconTile(systemImage, tool: .orb, size: 36)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(StFont.body(15, .semibold))
                     Text(subtitle)
-                        .font(.system(size: 12))
+                        .font(StFont.body(12))
                         .foregroundStyle(Color.stTextTertiary)
                 }
                 .lineLimit(1)
             }
             Text("\(Int((value * 100).rounded()))%")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .font(StFont.body(26, .bold))
                 .monospacedDigit()
             StSparkline(values: history)
                 .frame(height: 36)
@@ -173,12 +173,12 @@ struct StQuickTile: View {
                 StIconTile(systemImage, tool: tool)
                 Spacer()
                 Text("\(count)")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(StFont.body(20, .bold))
                     .monospacedDigit()
                     .foregroundStyle(tool.tone)
             }
             Text(title)
-                .font(.system(size: 16, weight: .semibold))
+                .font(StFont.body(16, .semibold))
                 .foregroundStyle(Color.stTextPrimary)
         }
         .padding(14)
@@ -258,7 +258,7 @@ struct StAreaChart: View {
                 AxisValueLabel {
                     if let number = value.as(Double.self), number == yTicks[yTicks.count / 2] {
                         Text("\(Int(number))%")
-                            .font(.system(size: 11))
+                            .font(StFont.body(11))
                             .foregroundStyle(Color.stTextQuaternary)
                     }
                 }
@@ -277,7 +277,7 @@ struct StLegendPill: View {
         HStack(spacing: 6) {
             Capsule().fill(color).frame(width: 12, height: 4)
             Text(text)
-                .font(.system(size: 12, weight: .semibold))
+                .font(StFont.body(12, .semibold))
                 .monospacedDigit()
         }
         .foregroundStyle(Color.stTextPrimary)
@@ -323,11 +323,11 @@ struct StHostCard: View {
                     ForEach(metrics.prefix(3)) { metric in
                         VStack(spacing: 6) {
                             Text(metric.label)
-                                .font(.system(size: 12))
+                                .font(StFont.body(12))
                                 .foregroundStyle(Color.stTextPrimary.opacity(0.55))
                             StRing(value: metric.value, size: .small)
                             Text(metric.detail)
-                                .font(.system(size: 12))
+                                .font(StFont.body(12))
                                 .foregroundStyle(Color.stTextTertiary)
                         }
                         .lineLimit(1)
@@ -361,14 +361,14 @@ struct StHostCard: View {
                 header(uptime: nil, isOnline: false)
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 18))
+                        .font(StFont.body(18))
                         .foregroundStyle(StTool.fx.tone)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(StFont.body(14, .semibold))
                             .foregroundStyle(StTool.fx.tone)
                         Text(log)
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(StFont.body(12))
                             .foregroundStyle(Color.stTextPrimary.opacity(0.55))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -395,20 +395,20 @@ struct StHostCard: View {
     private func header(uptime: String?, isOnline: Bool) -> some View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
-                .font(.system(size: 20, weight: .semibold))
+                .font(StFont.body(20, .semibold))
                 .foregroundStyle(isOnline ? StTool.orb.tone : Color.stTextPrimary.opacity(0.6))
                 .frame(width: 48, height: 48)
                 .background(Circle().fill(isOnline ? StTool.orb.opacity(0.18) : Color.stInk600))
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(StFont.body(18, .semibold))
                     .foregroundStyle(Color.stTextPrimary)
                 HStack(spacing: 6) {
                     Circle()
                         .fill(isOnline ? StTool.timer.tone : Color.stTextPrimary.opacity(0.38))
                         .frame(width: 7, height: 7)
                     Text(subtitle)
-                        .font(.system(size: 13))
+                        .font(StFont.body(13))
                         .foregroundStyle(Color.stTextPrimary.opacity(0.55))
                         .lineLimit(1)
                 }
@@ -416,11 +416,11 @@ struct StHostCard: View {
             Spacer(minLength: 8)
             if let uptime {
                 Text(uptime)
-                    .font(.system(size: 13))
+                    .font(StFont.body(13))
                     .foregroundStyle(Color.stTextTertiary)
             }
             Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
+                .font(StFont.body(13, .semibold))
                 .foregroundStyle(Color.stTextQuaternary)
         }
     }
@@ -428,7 +428,7 @@ struct StHostCard: View {
     private func networkWell(down: Int, up: Int, history: [Double]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Rede")
-                .font(.system(size: 12))
+                .font(StFont.body(12))
                 .foregroundStyle(Color.stTextPrimary.opacity(0.55))
             Spacer(minLength: 0)
             VStack(alignment: .leading, spacing: 4) {
@@ -441,7 +441,7 @@ struct StHostCard: View {
                     Text("\(up) K/s")
                 }
             }
-            .font(.system(size: 13, weight: .semibold))
+            .font(StFont.body(13, .semibold))
             .monospacedDigit()
             .foregroundStyle(Color.stTextPrimary)
             .lineLimit(1)
@@ -506,7 +506,7 @@ private enum StPreviewData {
                 HStack(spacing: 10) {
                     StTag("Ao vivo", tool: .timer)
                     Text("CPU · A17 Pro")
-                        .font(.system(size: 14))
+                        .font(StFont.body(14))
                         .foregroundStyle(Color.stTextTertiary)
                 }
                 HStack(spacing: 6) {

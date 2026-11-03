@@ -2,13 +2,13 @@
 
 ## Objetivo e escopo
 
-SmartiumTools é uma base SwiftUI para ferramentas futuras. Priorize recursos reutilizáveis e uma interface enxuta. Widgets, Live Activities, aparência via iCloud e orbes já existem; `VoiceRingView` é um placeholder e AlarmKit ainda não foi implementado. Consulte [README.md](README.md) para funcionalidades, configuração e execução.
+SmartiumTools é uma base SwiftUI para ferramentas futuras. Priorize recursos reutilizáveis e uma interface enxuta. Widgets, Live Activities, ajustes via iCloud e orbes já existem; `VoiceRingView` é um placeholder e AlarmKit ainda não foi implementado. Consulte [README.md](README.md) para funcionalidades, configuração e execução.
 
 ## Estrutura e targets
 
 - `SmartiumTools/`: app; entrada em `SmartiumToolsApp.swift`, raiz em `ContentView.swift`.
 - `ThinkingOrbsKit/`: motor e renderer locais, compartilhados com a extensão.
-- `SmartiumCapabilities/`: estado, aparência, AppIntents, widgets e Live Activity.
+- `SmartiumCapabilities/`: estado, AppIntents, widgets e Live Activity.
 - `SmartiumWidgets/`: entrada e assets da extensão `SmartiumWidgetsExtension`.
 - `SmartiumTools.xcodeproj/project.xcproj`: descrição de projeto com sintaxe semelhante a JSON, não um `project.pbxproj` tradicional.
 
@@ -28,11 +28,11 @@ Substitua `<UDID>` pelo aparelho conectado. O build inclui a extensão. Para mud
 
 Não há target de testes nem vetores golden no repositório. Não afirme que `xcodebuild test` ou paridade matemática foram aprovados. Fórmulas dos orbes usam `Double`; preserve a transcrição TypeScript e a proveniência das constantes. O gerador de `OrbSpec.swift` também não está disponível localmente. Evite importar o `ThinkingOrbsKit` remoto: o app usa a cópia local.
 
-## Estado, aparência e concorrência
+## Estado, ajustes e concorrência
 
-Mantenha compatibilidade Codable com dados existentes. `ToolSharedState` e `AppearanceSettings` usam o App Group. Preserve `group.dev.smartium.tests` e `iCloud.dev.smartium.tests`; não sobrescreva o `settings.json` do usuário. A aparência é relida ao ativar a cena.
+Mantenha compatibilidade Codable com dados existentes. `ToolSharedState` usa o App Group. Preserve `group.dev.smartium.tools` e `iCloud.dev.smartium.tools`; não sobrescreva o `settings.json` do usuário. Os ajustes do iCloud são relidos ao ativar a cena.
 
-Ativação e mudança de estado reiniciam os cinco segundos de cor de destaque e movimento da Live Activity. Mensagem, progresso e aparência não reiniciam o prazo. Preserve Reduzir Movimento, cancelamento de tarefas e encerramento do tempo em segundo plano.
+Ativação e mudança de estado reiniciam os cinco segundos de cor de destaque e movimento da Live Activity. Mensagem e progresso não reiniciam o prazo. Preserve Reduzir Movimento, cancelamento de tarefas e encerramento do tempo em segundo plano.
 
 Os targets usam isolamento padrão `MainActor` e approachable concurrency. Preserve `nonisolated`/`Sendable` nos modelos compartilhados e operações de disco fora da main thread. Isole ActivityKit com `#if canImport(ActivityKit) && os(iOS)`.
 

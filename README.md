@@ -1,6 +1,6 @@
 # SmartiumTools
 
-Base em SwiftUI para uma coleção de ferramentas. O objetivo é manter uma interface simples e preparar recursos reutilizáveis, para que cada ferramenta futura aproveite a mesma infraestrutura de estado, aparência e integração com o sistema.
+Base em SwiftUI para uma coleção de ferramentas. O objetivo é manter uma interface simples e preparar recursos reutilizáveis, para que cada ferramenta futura aproveite a mesma infraestrutura de estado e integração com o sistema.
 
 ## Estado atual
 
@@ -9,7 +9,7 @@ Base em SwiftUI para uma coleção de ferramentas. O objetivo é manter uma inte
 - Widgets pequenos e médios, com ações para alternar o estado.
 - Live Activity e Ilha Dinâmica no iOS, com ações para alternar o estado e encerrar a sessão.
 - Ao ativar uma Live Activity ou mudar o estado, o orbe usa a cor de destaque e se move por cinco segundos; depois, volta à paleta padrão e fica estático. O movimento respeita Reduzir Movimento e os limites de execução do iOS.
-- Aparência configurável pelo iCloud Drive, compartilhada com widgets e Live Activities.
+- Ajustes sincronizados entre dispositivos pelo iCloud Drive.
 - AlarmKit no iOS para alarmes com contagem regressiva, incluindo Ilha Dinâmica e Atividade ao Vivo.
 - No macOS, navegação na toolbar e título da janela oculto para evitar redundância.
 
@@ -42,38 +42,41 @@ xcodebuild -project SmartiumTools.xcodeproj -scheme SmartiumTools \
 
 O build do app também compila a extensão `SmartiumWidgetsExtension`. Compilar não equivale a instalar, executar ou validar a interface.
 
-## Aparência pelo iCloud
+## Ajustes pelo iCloud
 
-O app lê `Documents/settings.json` no container `iCloud.dev.smartium.tests`, apresentado no iCloud Drive como **Smartium**. Se o arquivo não existir, cria um arquivo vazio sem sobrescrever conteúdo existente.
+O app lê `Documents/settings.json` no container `iCloud.dev.smartium.tools`, apresentado no iCloud Drive como **Smartium**. Se o arquivo não existir, cria um arquivo vazio sem sobrescrever conteúdo existente. Os ajustes são sincronizados entre os dispositivos:
 
 ```json
 {
-  "appearance": {
-    "theme": "system",
-    "accent-color": "purple"
-  }
+  "tabOrder": ["orb", "voice", "timer", "staging", "monitor"],
+  "monitor": { "pinnedMetric": null, "interval": 1.0 },
+  "limitimer": { "end-message": "Encerrado!", "recents": [] }
 }
 ```
 
-- `theme`: `system`, `light` ou `dark`.
-- `accent-color`: `purple`, `black`, `white`, `red`, `orange`, `yellow`, `green`, `mint`, `teal`, `cyan`, `blue`, `indigo`, `pink`, `brown`, `gray` ou `grey`.
+- `tabOrder`: ordem das abas. Ferramentas fora da lista entram no fim; lista vazia usa a ordem padrão.
+- `monitor.pinnedMetric`: `memory`, `disk`, `gpu`, `battery` ou `null` (CPU no destaque).
+- `monitor.interval`: intervalo de leitura do Monitor, em segundos.
+- `limitimer`: mensagem de fim e timers recentes.
 
-As configurações são relidas ao abrir ou voltar ao app, após a sincronização do iCloud. Não há monitoramento contínuo de edições. Campos ausentes usam os padrões; temas desconhecidos seguem o sistema e cores desconhecidas usam roxo. Falhas de leitura preservam a configuração em cache. A Ilha Dinâmica mantém sua apresentação escura, usando a cor de destaque configurada.
+Cada ajuste grava só a própria chave e preserva as demais, inclusive as editadas à mão. A chave antiga `appearance` é removida na próxima gravação. O app mantém uma cópia local em `Application Support` para abrir com os últimos valores mesmo sem iCloud.
+
+Os ajustes são relidos ao abrir ou voltar ao app, após a sincronização do iCloud; os valores do iCloud prevalecem, e se o arquivo ainda não tiver as chaves, o dispositivo publica os seus. Não há monitoramento contínuo de edições. Campos ausentes usam os padrões. Falhas de leitura preservam os valores em cache.
 
 ## Estrutura
 
 | Caminho | Responsabilidade |
 | --- | --- |
-| `SmartiumTools/SmartiumToolsApp.swift` | Entrada, aparência e ciclo de vida da cena |
+| `SmartiumTools/SmartiumToolsApp.swift` | Entrada, sincronização de ajustes e ciclo de vida da cena |
 | `SmartiumTools/ContentView.swift` | Interface base e controles de demonstração |
 | `SmartiumTools/ThinkingOrbsKit/` | Geometria, presets, renderer e snapshots dos orbes |
-| `SmartiumTools/SmartiumCapabilities/` | Estado compartilhado, aparência, intents, widgets e Live Activity |
+| `SmartiumTools/SmartiumCapabilities/` | Estado compartilhado, intents, widgets e Live Activity |
 | `SmartiumTools/ICloudSettings.swift` | Criação e leitura coordenada de `settings.json` |
 | `SmartiumTools/AlarmKitView.swift` | Tela do AlarmKit, contagem regressiva e agendamento no iOS |
 | `SmartiumWidgets/` | Entrada e assets da extensão WidgetKit |
 | `SmartiumTools.xcodeproj/` | Targets, schemes e configuração de build |
 
-O App Group `group.dev.smartium.tests` guarda estado e aparência para os dois targets. Esses identificadores foram preservados durante a renomeação do projeto.
+O App Group `group.dev.smartium.tools` guarda o estado compartilhado pelos dois targets.
 
 ## Validação e contribuição
 

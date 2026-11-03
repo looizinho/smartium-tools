@@ -93,18 +93,21 @@ struct StAdaptiveToolLayout<Hero: View, Controls: View>: View {
     case .portrait:
       ScrollView {
         VStack(spacing: 14) {
-          StAppHeader(tool: tool, tag: tag, logoSize: mode.logoSize)
-            .padding(.top, 8)
           hero(mode.heroSize)
             .frame(maxWidth: .infinity)
             .frame(height: mode.heroSize + 26)
           controlsStack
         }
+        .padding(.top, 4)
         .padding(.horizontal, StSpacing.screenMargin)
         .padding(.bottom, 24)
       }
       .scrollBounceBehavior(.basedOnSize)
       .scrollDismissesKeyboard(.interactively)
+      .safeAreaInset(edge: .top, spacing: 0) {
+        stickyHeader(top: 8)
+          .padding(.horizontal, StSpacing.screenMargin)
+      }
 
     case .landscape:
       HStack(alignment: .top, spacing: 22) {
@@ -112,15 +115,15 @@ struct StAdaptiveToolLayout<Hero: View, Controls: View>: View {
           .frame(width: 300)
           .frame(maxHeight: .infinity)
         ScrollView {
-          VStack(spacing: 12) {
-            StAppHeader(tool: tool, tag: tag, logoSize: mode.logoSize)
-              .padding(.top, 4)
-            controlsStack
-          }
-          .padding(.bottom, 24)
+          controlsStack
+            .padding(.top, 2)
+            .padding(.bottom, 24)
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .top, spacing: 0) {
+          stickyHeader(top: 4)
+        }
       }
       .padding(.top, 16)
 
@@ -141,6 +144,21 @@ struct StAdaptiveToolLayout<Hero: View, Controls: View>: View {
       }
       .padding(24)
     }
+  }
+
+  /// Header that stays at the top while the content scrolls under it (v0.3):
+  /// `#0B0A10 @55%` over a blur, bleeding 20pt past the sides.
+  private func stickyHeader(top: CGFloat) -> some View {
+    StAppHeader(tool: tool, tag: tag, logoSize: mode.logoSize)
+      .padding(.top, top)
+      .padding(.bottom, 10)
+      .background {
+        Rectangle()
+          .fill(Color.stInkBase.opacity(0.55))
+          .background(.ultraThinMaterial)
+          .padding(.horizontal, -StSpacing.screenMargin)
+          .ignoresSafeArea(edges: .top)
+      }
   }
 
   private var controlsStack: some View {
@@ -184,7 +202,7 @@ struct StDock<ID: Hashable>: View {
           expand()
         } label: {
           Image(systemName: current.systemImage)
-            .font(.system(size: 22, weight: .semibold))
+            .font(StFont.body(22, .semibold))
             .foregroundStyle(current.tool.tone)
             .frame(width: 48, height: 48)
             .background(Circle().fill(current.tool.opacity(0.18)))
@@ -219,7 +237,7 @@ struct StDock<ID: Hashable>: View {
       setExpanded(false)
     } label: {
       Image(systemName: item.systemImage)
-        .font(.system(size: 22, weight: .semibold))
+        .font(StFont.body(22, .semibold))
         .foregroundStyle(isSelected ? Color.stInk900 : item.tool.tone)
         .frame(width: 48, height: 48)
         .background(Circle().fill(isSelected ? item.tool.tone : .clear))
@@ -295,7 +313,7 @@ struct StSidebar<ID: Hashable>: View {
     } label: {
       HStack(spacing: 12) {
         Image(systemName: item.systemImage)
-          .font(.system(size: 16, weight: .semibold))
+          .font(StFont.body(16, .semibold))
           .foregroundStyle(item.tool.tone)
           .frame(width: 32, height: 32)
           .background(
@@ -303,7 +321,7 @@ struct StSidebar<ID: Hashable>: View {
               .fill(item.tool.opacity(0.18))
           )
         Text(item.title)
-          .font(.system(size: 15, weight: .semibold))
+          .font(StFont.body(15, .semibold))
           .foregroundStyle(Color.stTextPrimary.opacity(isSelected ? 1 : 0.7))
         Spacer(minLength: 0)
       }

@@ -52,6 +52,12 @@ nonisolated public struct LimitimerSettings: Codable, Hashable, Sendable {
         recents = Array(recents.prefix(Self.maximumRecents))
     }
 
+    public func removingRecent(id: LimitimerRecent.ID) -> Self {
+        var settings = self
+        settings.recents.removeAll { $0.id == id }
+        return settings
+    }
+
     public func withRecent(duration: TimeInterval, message: String) -> Self {
         let existing = recents.filter {
             $0.duration != duration || $0.message != message

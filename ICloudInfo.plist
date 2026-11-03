@@ -11,12 +11,14 @@
     <key>UIAppFonts</key>
     <array>
         <string>Arial Rounded Bold.ttf</string>
+        <string>Nunito-Variable.ttf</string>
+        <string>DigitalDotted-Mono.otf</string>
     </array>
     <key>ATSApplicationFontsPath</key>
     <string>.</string>
     <key>NSUbiquitousContainers</key>
     <dict>
-        <key>iCloud.dev.smartium.tests</key>
+        <key>iCloud.dev.smartium.tools</key>
         <dict>
             <key>NSUbiquitousContainerIsDocumentScopePublic</key>
             <true/>

@@ -22,7 +22,6 @@ nonisolated public struct SmartiumActivityAttributes: ActivityAttributes, Sendab
         public var updatedAt: Date
         /// Absolute deadline for the latest activation or orb state change.
         public var animationEndsAt: Date?
-        public var appearance: AppearanceSettings?
         /// Tool that owns the activity (`StTool.rawValue`); its color tints the island.
         /// Optional so states encoded before v0.2 still decode.
         public var toolRaw: String?
@@ -33,7 +32,6 @@ nonisolated public struct SmartiumActivityAttributes: ActivityAttributes, Sendab
             stepProgress: Double? = nil,
             updatedAt: Date = .now,
             animationEndsAt: Date? = nil,
-            appearance: AppearanceSettings? = nil,
             toolRaw: String? = "orb"
         ) {
             self.orbStateRaw = orbStateRaw
@@ -41,7 +39,6 @@ nonisolated public struct SmartiumActivityAttributes: ActivityAttributes, Sendab
             self.stepProgress = stepProgress
             self.updatedAt = updatedAt
             self.animationEndsAt = animationEndsAt
-            self.appearance = appearance
             self.toolRaw = toolRaw
         }
 
@@ -165,7 +162,6 @@ public final class LiveActivityManager {
             stepProgress: progress,
             updatedAt: .now,
             animationEndsAt: Date.now.addingTimeInterval(5),
-            appearance: .load(),
             toolRaw: StTool.orb.rawValue
         )
 
@@ -208,17 +204,7 @@ public final class LiveActivityManager {
             updatedState.changeOrbState(to: newOrbState.rawValue, at: .now)
             updatedState.statusText = sharedState.statusMessage
             updatedState.stepProgress = sharedState.stepProgress
-            updatedState.appearance = .load()
             await activity.update(ActivityContent(state: updatedState, staleDate: updatedState.animationEndsAt))
-        }
-    }
-
-    /// Ask WidgetKit to render the newly cached appearance without restarting animation.
-    public func refreshAppearance() async {
-        for activity in activeActivities {
-            var state = activity.content.state
-            state.appearance = .load()
-            await activity.update(ActivityContent(state: state, staleDate: state.animationEndsAt))
         }
     }
 

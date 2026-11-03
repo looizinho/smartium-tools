@@ -44,7 +44,7 @@ struct SmartiumTimerLiveActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     SmartiumTimerCountdownText(state: context.state)
-                        .font(.system(size: 28, weight: .medium, design: .rounded))
+                        .font(StFont.body(28, .medium))
                         .foregroundStyle(tool.tone)
                         .frame(maxWidth: 110, alignment: .trailing)
                         .padding(.trailing, 4)
@@ -55,7 +55,7 @@ struct SmartiumTimerLiveActivityWidget: Widget {
                             .fill(StTool.timer.tone)
                             .frame(width: 7, height: 7)
                         Text(SmartiumTimerStatus.text(for: context.state))
-                            .font(.caption.weight(.semibold))
+                            .font(StFont.body(12, .semibold))
                             .foregroundStyle(.white.opacity(0.75))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,7 +65,7 @@ struct SmartiumTimerLiveActivityWidget: Widget {
                 SmartiumIslandIcon(tool: tool, size: 22)
             } compactTrailing: {
                 SmartiumTimerCountdownText(state: context.state)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(StFont.body(13, .semibold))
                     .foregroundStyle(tool.tone)
                     .frame(maxWidth: 52)
             } minimal: {
@@ -83,7 +83,7 @@ struct SmartiumIslandIcon: View {
 
     var body: some View {
         Image(systemName: tool.systemImage)
-            .font(.system(size: size * 0.64, weight: .semibold))
+            .font(StFont.body(size * 0.64, .semibold))
             .foregroundStyle(tool.tone)
             .frame(width: size, height: size)
             .background(Circle().fill(tool.opacity(0.22)))
@@ -141,17 +141,17 @@ private struct SmartiumTimerBannerView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("Timer")
-                    .font(.caption.weight(.semibold))
+                    .font(StFont.body(12, .semibold))
                     .foregroundStyle(tool.tone)
                 Text(SmartiumTimerStatus.text(for: state))
-                    .font(.subheadline.weight(.bold))
+                    .font(StFont.body(15, .bold))
                     .foregroundStyle(.white)
             }
 
             Spacer()
 
             SmartiumTimerCountdownText(state: state)
-                .font(.system(size: 34, weight: .medium, design: .rounded))
+                .font(StFont.body(34, .medium))
                 .foregroundStyle(tool.tone)
                 .frame(maxWidth: 140, alignment: .trailing)
         }

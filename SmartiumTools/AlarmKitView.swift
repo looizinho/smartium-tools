@@ -38,7 +38,8 @@ struct AlarmKitView: View {
     }
 }
 
-/// Timer hero (v0.2): Menta progress ring, Sky tick ring, label + clock + status.
+/// Timer hero: Menta progress ring, Sky tick ring, label + clock + status.
+/// The clock is a white `StBigNumber` without glow (v0.3).
 struct StTimerRing: View {
     let size: CGFloat
     /// Remaining fraction, 0–1.
@@ -47,69 +48,33 @@ struct StTimerRing: View {
     let clock: String
     let status: String
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         let timer = StTool.timer
         let sky = StAccent.sky
-        // SVG viewBox 100: ring r44 stroke 5, ticks r37 stroke 1.6.
-        let unit = size / 100
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        stops: [
-                            .init(color: timer.opacity(0.22), location: 0),
-                            .init(color: sky.color(opacity: 0.08), location: 0.5),
-                            .init(color: timer.opacity(0), location: 0.7)
-                        ],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: size * 1.12 * 0.5
-                    )
-                )
-                .padding(-size * 0.06)
-
-            Circle()
-                .stroke(timer.opacity(0.14), lineWidth: 5 * unit)
-                .frame(width: 88 * unit, height: 88 * unit)
-
-            Circle()
-                .trim(from: 0, to: min(max(fraction, 0), 1))
-                .stroke(timer.tone, style: StrokeStyle(lineWidth: 5 * unit, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .frame(width: 88 * unit, height: 88 * unit)
-                .animation(reduceMotion ? nil : .linear(duration: 0.9), value: fraction)
-
-            Circle()
-                .stroke(
-                    sky.color(opacity: 0.45),
-                    style: StrokeStyle(lineWidth: 1.6 * unit, lineCap: .round, dash: [0.1 * unit, 3.77 * unit])
-                )
-                .frame(width: 74 * unit, height: 74 * unit)
-
+        StDialRing(
+            size: size,
+            fraction: fraction,
+            ringColor: timer.tone,
+            trackColor: timer.opacity(0.14),
+            tickColor: sky.color(opacity: 0.45),
+            halo: [
+                .init(color: timer.opacity(0.22), location: 0),
+                .init(color: sky.color(opacity: 0.08), location: 0.5),
+                .init(color: timer.opacity(0), location: 0.7)
+            ]
+        ) {
             VStack(spacing: 2) {
                 Text(label)
                     .font(.stTag)
                     .tracking(1.4)
                     .foregroundStyle(sky.color)
-                Text(clock)
-                    .font(.system(size: (size * 0.2).rounded(), weight: .medium, design: .rounded))
-                    .monospacedDigit()
-                    .tracking(-1)
-                    .foregroundStyle(Color.stTextPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .contentTransition(.numericText())
-                    .animation(reduceMotion ? nil : .snappy, value: clock)
+                StBigNumber(clock, size: (size * 0.2).rounded())
                 Text(status)
-                    .font(.system(size: 13))
+                    .font(StFont.body(13))
                     .foregroundStyle(Color.stTextPrimary.opacity(0.55))
             }
-            .frame(width: 70 * unit)
             .accessibilityElement(children: .combine)
         }
-        .frame(width: size, height: size)
     }
 }
 
@@ -130,19 +95,22 @@ private nonisolated enum TimerFormat {
 
 }
 
-/// Timer shortcuts (v0.2 "ATALHOS").
-private struct TimerShortcut: Hashable {
+/// Timer adjustments (v0.3 "ATALHOS"): add or remove time, no selected state.
+private struct TimerAdjustment: Hashable {
     let seconds: Int
-    let title: String
     let color: StRGB
-    var message: String? = nil
 
-    static let all: [TimerShortcut] = [
-        TimerShortcut(seconds: 60, title: "1 min", color: StAccent.sky),
-        TimerShortcut(seconds: 300, title: "5 min", color: StTool.timer.rgb),
-        TimerShortcut(seconds: 600, title: "10 min", color: StTool.fx.rgb),
-        TimerShortcut(seconds: 1_500, title: "Pomodoro", color: StTool.voice.rgb, message: "Pomodoro"),
-        TimerShortcut(seconds: 2_700, title: "45 min", color: StTool.orb.rgb)
+    var title: String {
+        (seconds > 0 ? "+" : "−") + "\(abs(seconds) / 60) min"
+    }
+
+    static let all: [TimerAdjustment] = [
+        TimerAdjustment(seconds: 60, color: StTool.timer.rgb),
+        TimerAdjustment(seconds: 300, color: StAccent.sky),
+        TimerAdjustment(seconds: 600, color: StTool.orb.rgb),
+        TimerAdjustment(seconds: -60, color: StTool.fx.rgb),
+        TimerAdjustment(seconds: -300, color: StTool.voice.rgb),
+        TimerAdjustment(seconds: -600, color: StAccent.brand)
     ]
 }
 
@@ -152,6 +120,8 @@ private struct AlarmKitViewContent: View {
     @State private var selectedMinutes = 5
     @State private var selectedSeconds = 0
     @State private var limitimerSettings = LimitimerSettings()
+    /// The recent row swiped open, if any.
+    @State private var openRecentID: LimitimerRecent.ID?
 
     var body: some View {
         StAdaptiveToolLayout(tool: .timer, tag: "Timer") { size in
@@ -179,11 +149,11 @@ private struct AlarmKitViewContent: View {
             StChipSection(
                 title: "Atalhos",
                 dot: StTool.timer.secondary,
-                items: TimerShortcut.all,
+                items: TimerAdjustment.all,
                 label: \.title,
                 color: \.color,
-                isOn: { Double($0.seconds) == currentDuration },
-                select: startShortcut
+                isOn: { _ in false },
+                select: adjust
             )
             if !limitimerSettings.recents.isEmpty {
                 recents
@@ -200,6 +170,8 @@ private struct AlarmKitViewContent: View {
         } message: { error in
             Text(error.message)
         }
+        // Any tap elsewhere closes an open recent row.
+        .simultaneousGesture(TapGesture().onEnded { closeRecent() }, including: openRecentID == nil ? .subviews : .all)
         .onChange(of: limitimerSettings.endMessage) { _, _ in
             saveTimerSettings()
         }
@@ -211,11 +183,6 @@ private struct AlarmKitViewContent: View {
 
     private var selectedDuration: TimeInterval {
         Double(selectedHours * 3_600 + selectedMinutes * 60 + selectedSeconds)
-    }
-
-    /// The running timer's total, or the picker value when idle.
-    private var currentDuration: TimeInterval {
-        activeAlarm == nil ? selectedDuration : (manager.totalDuration ?? selectedDuration)
     }
 
     /// The alarm the screen controls: the first one counting down, paused or alerting.
@@ -293,6 +260,7 @@ private struct AlarmKitViewContent: View {
         Picker(label, selection: selection) {
             ForEach(range, id: \.self) { value in
                 Text("\(value)")
+                    .font(StFont.body(21))
                     .monospacedDigit()
                     .tag(value)
             }
@@ -303,7 +271,7 @@ private struct AlarmKitViewContent: View {
         .clipped()
         .overlay {
             Text(label)
-                .font(.system(size: 15, weight: .semibold))
+                .font(StFont.body(15, .semibold))
                 .foregroundStyle(StTool.timer.tone)
                 .offset(x: label == "min" ? 34 : 26)
                 .allowsHitTesting(false)
@@ -347,7 +315,7 @@ private struct AlarmKitViewContent: View {
         let shape = RoundedRectangle(cornerRadius: StRadius.row, style: .continuous)
         return HStack(spacing: 12) {
             Image(systemName: "text.bubble")
-                .font(.system(size: 17, weight: .semibold))
+                .font(StFont.body(17, .semibold))
                 .foregroundStyle(sky.color)
                 .frame(width: 38, height: 38)
                 .background(
@@ -356,7 +324,7 @@ private struct AlarmKitViewContent: View {
                 )
                 .accessibilityHidden(true)
             TextField("Mensagem de encerramento", text: $limitimerSettings.endMessage)
-                .font(.system(size: 16, weight: .medium))
+                .font(StFont.body(16, .medium))
                 .foregroundStyle(Color.stTextPrimary)
                 .submitLabel(.done)
         }
@@ -372,13 +340,22 @@ private struct AlarmKitViewContent: View {
     private var recents: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Recentes")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(StFont.body(20, .bold))
                 .padding(.top, 8)
                 .padding(.horizontal, 4)
                 .accessibilityAddTraits(.isHeader)
 
             ForEach(Array(limitimerSettings.recents.enumerated()), id: \.element.id) { index, recent in
-                recentRow(recent, color: [StAccent.sky, StTool.voice.rgb, StTool.fx.rgb, StTool.orb.rgb][index % 4])
+                StSwipeToDelete(
+                    isOpen: Binding(
+                        get: { openRecentID == recent.id },
+                        set: { openRecentID = $0 ? recent.id : nil }
+                    ),
+                    onDelete: { deleteRecent(recent) }
+                ) {
+                    recentRow(recent, color: [StAccent.sky, StTool.voice.rgb, StTool.fx.rgb, StTool.orb.rgb][index % 4])
+                }
+                .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -388,7 +365,7 @@ private struct AlarmKitViewContent: View {
         let shape = RoundedRectangle(cornerRadius: StRadius.row, style: .continuous)
         return HStack(alignment: .center, spacing: 14) {
             Image(systemName: "timer")
-                .font(.system(size: 19, weight: .semibold))
+                .font(StFont.body(19, .semibold))
                 .foregroundStyle(color.color)
                 .frame(width: 44, height: 44)
                 .background(
@@ -398,13 +375,10 @@ private struct AlarmKitViewContent: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(TimerFormat.duration(recent.duration))
-                    .font(.system(size: 24, weight: .medium, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.stTextPrimary)
+                StBigNumber(TimerFormat.duration(recent.duration), size: 24)
 
                 Text(recent.message.isEmpty ? "Sem mensagem" : recent.message)
-                    .font(.system(size: 13))
+                    .font(StFont.body(13))
                     .foregroundStyle(Color.stTextPrimary.opacity(0.55))
                     .lineLimit(1)
             }
@@ -416,7 +390,7 @@ private struct AlarmKitViewContent: View {
                 startTimer(duration: recent.duration, message: recent.message)
             } label: {
                 Image(systemName: "play.fill")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(StFont.body(15, .bold))
                     .foregroundStyle(StTool.timer.tone)
                     .frame(width: 44, height: 44)
                     .background(Circle().fill(StTool.timer.opacity(0.16)))
@@ -430,9 +404,32 @@ private struct AlarmKitViewContent: View {
         .overlay(shape.strokeBorder(.white.opacity(0.05), lineWidth: 1))
     }
 
-    private func startShortcut(_ shortcut: TimerShortcut) {
-        applyDuration(shortcut.seconds)
-        startTimer(duration: Double(shortcut.seconds), message: shortcut.message ?? limitimerSettings.endMessage)
+    /// Stopped: changes the set time (0…23:59:59). Running or paused: changes
+    /// the remaining time without stopping; reaching 0 resets the timer.
+    private func adjust(_ adjustment: TimerAdjustment) {
+        guard let activeAlarm else {
+            applyDuration(min(86_399, max(0, Int(selectedDuration) + adjustment.seconds)))
+            return
+        }
+        guard activeAlarm.state != .alerting else { return }
+        Task {
+            await manager.adjust(activeAlarm, by: TimeInterval(adjustment.seconds))
+        }
+    }
+
+    private func deleteRecent(_ recent: LimitimerRecent) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            limitimerSettings = limitimerSettings.removingRecent(id: recent.id)
+            openRecentID = nil
+        }
+        saveTimerSettings()
+    }
+
+    private func closeRecent() {
+        guard openRecentID != nil else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+            openRecentID = nil
+        }
     }
 
     private func applyDuration(_ seconds: Int) {
@@ -487,6 +484,10 @@ private final class AlarmKitManager {
     private(set) var isWorking = false
     /// Duration of the last timer this screen scheduled.
     private(set) var scheduledDuration: TimeInterval?
+    /// Ring total after live adjustments; nil uses AlarmKit's total.
+    private(set) var ringTotalOverride: TimeInterval?
+    private var lastMessage = ""
+    private var lastTint = StTool.timer.tone
     private(set) var lastErrorMessage: String?
 
     private var presentationMonitorTask: Task<Void, Never>?
@@ -506,7 +507,15 @@ private final class AlarmKitManager {
         }
     }
 
-    func scheduleTimer(duration: TimeInterval, tint: Color, message: String) async {
+    /// `ringTotal` keeps the ring's total across live adjustments;
+    /// `startPaused` reschedules a paused timer without resuming it.
+    func scheduleTimer(
+        duration: TimeInterval,
+        tint: Color,
+        message: String,
+        ringTotal: TimeInterval? = nil,
+        startPaused: Bool = false
+    ) async {
         isWorking = true
         defer { isWorking = false }
 
@@ -547,8 +556,15 @@ private final class AlarmKitManager {
                 attributes: attributes
             )
 
-            _ = try await AlarmManager.shared.schedule(id: UUID(), configuration: configuration)
+            let id = UUID()
+            _ = try await AlarmManager.shared.schedule(id: id, configuration: configuration)
+            if startPaused {
+                try AlarmManager.shared.pause(id: id)
+            }
             scheduledDuration = duration
+            ringTotalOverride = ringTotal
+            lastMessage = message
+            lastTint = tint
             refresh()
         } catch {
             lastErrorMessage = error.localizedDescription
@@ -570,6 +586,28 @@ private final class AlarmKitManager {
         } catch {
             lastErrorMessage = error.localizedDescription
         }
+    }
+
+    /// AlarmKit can't change a scheduled timer, so an adjustment replaces it:
+    /// cancel, then schedule the new remaining time (paused if it was paused).
+    /// Adding past the original total grows the ring's total with it.
+    func adjust(_ alarm: Alarm, by delta: TimeInterval) async {
+        guard let remaining = remainingSeconds(at: .now) else { return }
+        let total = totalDuration ?? remaining
+        let newRemaining = (remaining + delta).rounded(.up)
+        let wasPaused = alarm.state == .paused
+        cancel(alarm)
+        guard newRemaining > 0 else {
+            ringTotalOverride = nil
+            return
+        }
+        await scheduleTimer(
+            duration: newRemaining,
+            tint: lastTint,
+            message: lastMessage,
+            ringTotal: max(total, newRemaining),
+            startPaused: wasPaused
+        )
     }
 
     func cancel(_ alarm: Alarm) {
@@ -621,6 +659,9 @@ private final class AlarmKitManager {
 
     /// Total duration of the active countdown, from AlarmKit's presentation state.
     var totalDuration: TimeInterval? {
+        if let ringTotalOverride, activeAlarmExists {
+            return ringTotalOverride
+        }
         for state in presentationStates {
             switch state.mode {
             case .countdown(let countdown): return countdown.totalCountdownDuration
