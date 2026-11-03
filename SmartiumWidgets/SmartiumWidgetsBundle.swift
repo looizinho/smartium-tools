@@ -12,6 +12,7 @@ import WidgetKit
 struct SmartiumWidgetsBundle: WidgetBundle {
     var body: some Widget {
         SmartiumOrbWidget()
+        SmartiumMonitorWidget()
         #if canImport(ActivityKit) && os(iOS)
         SmartiumLiveActivityWidget()
         #endif
