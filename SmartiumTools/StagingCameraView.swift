@@ -77,38 +77,40 @@ private final class CameraPreviewView: UIView {
 
 @Observable
 private final class CameraPreviewManager {
-    let session = AVCaptureSession()
+    @ObservationIgnored private let controller = CameraSessionController()
+
+    var session: AVCaptureSession { controller.session }
 
     private(set) var isRunning = false
     private(set) var statusMessage = "Preparando a câmera…"
-    private var isConfigured = false
+    /// Cleared by `stopPreview()` so a start still awaiting authorization doesn't
+    /// turn the camera back on after the view went away.
+    private var wantsPreview = false
 
     func startPreview() async {
+        wantsPreview = true
         let authorized = await requestCameraAccess()
 
         guard authorized else {
             statusMessage = "Autorize a câmera nas Configurações para visualizar o Staging."
             return
         }
+        guard wantsPreview else { return }
 
-        configureSession()
+        let running = await controller.start()
+        guard wantsPreview else { return }
 
-        if !session.isRunning {
-            session.startRunning()
-        }
+        isRunning = running
 
-        isRunning = session.isRunning
-
-        if !isRunning {
+        if !running {
             statusMessage = "Não foi possível iniciar a câmera."
         }
     }
 
     func stopPreview() {
-        guard session.isRunning else { return }
-
-        session.stopRunning()
-        isRunning = session.isRunning
+        wantsPreview = false
+        isRunning = false
+        controller.stop()
     }
 
     private func requestCameraAccess() async -> Bool {
@@ -123,8 +125,40 @@ private final class CameraPreviewManager {
             return false
         }
     }
+}
 
-    private func configureSession() {
+/// Owns the capture session and runs every configuration/start/stop call on a
+/// serial queue: `startRunning()` blocks until the camera is up, so it must stay
+/// off the main thread. The serial queue also keeps start/stop in call order.
+nonisolated private final class CameraSessionController: @unchecked Sendable {
+    let session = AVCaptureSession()
+
+    private let queue = DispatchQueue(label: "dev.smartium.tools.camera-session")
+    /// Only read or written on `queue`.
+    private var isConfigured = false
+
+    func start() async -> Bool {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                self.configureIfNeeded()
+
+                if !self.session.isRunning {
+                    self.session.startRunning()
+                }
+
+                continuation.resume(returning: self.session.isRunning)
+            }
+        }
+    }
+
+    func stop() {
+        queue.async {
+            guard self.session.isRunning else { return }
+            self.session.stopRunning()
+        }
+    }
+
+    private func configureIfNeeded() {
         guard !isConfigured else { return }
 
         session.beginConfiguration()
