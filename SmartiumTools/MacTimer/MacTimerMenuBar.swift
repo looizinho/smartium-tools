@@ -46,6 +46,7 @@ struct MacTimerMenuBar: Scene {
 
 private struct MacTimerPopover: View {
     let service: StMacTimerService
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         let timer = StTool.timer
@@ -77,6 +78,11 @@ private struct MacTimerPopover: View {
                 StButton("Cancelar", systemImage: "xmark", kind: .iconTinted(.voice)) {
                     service.cancel()
                 }
+            }
+
+            // v0.8: opens the window on the Timer tab.
+            StButton("Abrir Timer", systemImage: "macwindow", kind: .tonal) {
+                openURL(StToolDestination.timer.url)
             }
         }
         .padding(18)

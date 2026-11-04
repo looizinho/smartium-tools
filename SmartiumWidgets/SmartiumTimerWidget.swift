@@ -40,6 +40,7 @@ struct SmartiumTimerWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: StLiveSurfaces.timerWidgetKind, provider: SmartiumTimerProvider()) { entry in
             SmartiumTimerWidgetView(entry: entry)
+                .widgetURL(StTool.timer.deepLink)
         }
         .configurationDisplayName("Timer")
         .description("Tempo restante do timer, com pausar e reiniciar.")

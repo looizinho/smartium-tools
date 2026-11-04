@@ -77,6 +77,7 @@ struct SmartiumMonitorWidget: Widget {
             provider: SmartiumMonitorProvider()
         ) { entry in
             SmartiumMonitorWidgetView(entry: entry)
+                .widgetURL(StTool.monitor.deepLink)
         }
         .configurationDisplayName("Monitor")
         .description("CPU, GPU, RAM e disco.")

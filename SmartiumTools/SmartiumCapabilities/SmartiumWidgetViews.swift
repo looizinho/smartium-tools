@@ -214,6 +214,7 @@ public struct SmartiumOrbWidget: Widget {
         StaticConfiguration(kind: kind, provider: SmartiumOrbTimelineProvider()) { entry in
             SmartiumOrbWidgetEntryView(entry: entry)
                 .tint(StTool.orb.tone)
+                .widgetURL(StTool.orb.deepLink)
         }
         .configurationDisplayName("Smartium Orb")
         .description("Exibe e controla o estado atual das ferramentas do SmartiumTools.")
@@ -351,6 +352,8 @@ public struct SmartiumLiveActivityWidget: Widget {
                 isStale: context.isStale
             )
             .activitySystemActionForegroundColor(tone)
+            // v0.8: always open on the owning tool's tab.
+            .widgetURL(context.state.tool.deepLink)
         } dynamicIsland: { context in
             let tool = context.state.tool
             let tone = tool.tone
@@ -424,6 +427,7 @@ public struct SmartiumLiveActivityWidget: Widget {
                 SmartiumLiveActivityIcon(tool: tool)
             }
             .keylineTint(tone)
+            .widgetURL(tool.deepLink)
         }
     }
 }
