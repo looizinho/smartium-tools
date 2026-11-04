@@ -14,10 +14,30 @@ struct SmartiumMonitorConfiguration: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Monitor"
     static let description = IntentDescription("Escolha a métrica do widget pequeno.")
 
-    @Parameter(title: "Métrica", default: .cpu)
-    var metric: StWidgetMetric
+    @Parameter(title: "Métrica", default: .pinned)
+    var metric: SmartiumMonitorMetricChoice
 
     init() {}
+}
+
+/// Small widget's metric choice. `pinned` follows the metric pinned in the
+/// app (v0.6); the others keep `StWidgetMetric`'s raw values, so widgets
+/// configured before this option existed keep their metric.
+enum SmartiumMonitorMetricChoice: String, AppEnum {
+    case pinned, cpu, gpu, memory, disk
+
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Métrica"
+    static let caseDisplayRepresentations: [SmartiumMonitorMetricChoice: DisplayRepresentation] = [
+        .pinned: "Fixada no app",
+        .cpu: "CPU",
+        .gpu: "GPU",
+        .memory: "RAM",
+        .disk: "Disco",
+    ]
+
+    var metric: StWidgetMetric {
+        StWidgetMetric(rawValue: rawValue) ?? StLiveSurfaces.pinnedWidgetMetric
+    }
 }
 
 struct SmartiumMonitorEntry: TimelineEntry {
@@ -44,7 +64,7 @@ struct SmartiumMonitorProvider: AppIntentTimelineProvider {
         SmartiumMonitorEntry(
             date: .now,
             metrics: StLiveSurfaces.metrics ?? .placeholder,
-            metric: configuration.metric
+            metric: configuration.metric.metric
         )
     }
 }
