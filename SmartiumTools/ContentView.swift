@@ -75,6 +75,18 @@ struct ContentView: View {
       .onChange(of: scenePhase) { _, phase in
         if phase == .active { openPendingTool() }
       }
+      // v0.8: Live Activities, widgets and the Mac timer open their own tab
+      // (`smartium://tool/<id>`). An unknown id keeps the current tab.
+      .onOpenURL { url in
+        guard let destination = StToolDestination(url: url),
+              let tab = ToolTab(rawValue: destination.rawValue),
+              tab != selectedTab else { return }
+        selectedTab = tab
+      }
+#if os(macOS)
+      // Links reuse the open window instead of opening a new one.
+      .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
+#endif
   }
 
   /// Switches to the tab a control or widget asked for (v0.5).

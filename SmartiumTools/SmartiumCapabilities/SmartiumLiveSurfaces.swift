@@ -242,3 +242,40 @@ nonisolated enum StToolDestination: String, AppEnum, Sendable {
         .monitor: "Monitor",
     ]
 }
+
+// MARK: - Deep links (v0.8)
+
+nonisolated extension StToolDestination {
+    static let urlScheme = "smartium"
+
+    /// `smartium://tool/<id>`: opens the app on this tool's tab. Live
+    /// Activities, widgets and the Mac timer use it.
+    var url: URL {
+        URL(string: "\(Self.urlScheme)://tool/\(rawValue)")!
+    }
+
+    /// The tool in a `smartium://tool/<id>` link; nil for any other URL or
+    /// an unknown id.
+    init?(url: URL) {
+        guard url.scheme == Self.urlScheme, url.host() == "tool",
+              let id = url.pathComponents.dropFirst().first else { return nil }
+        self.init(rawValue: id)
+    }
+
+    init(tool: StTool) {
+        switch tool {
+        case .orb: self = .orb
+        case .voice: self = .voice
+        case .timer: self = .timer
+        case .fx: self = .staging
+        case .monitor: self = .monitor
+        }
+    }
+}
+
+nonisolated extension StTool {
+    /// Link that opens the app on this tool's tab (v0.8).
+    var deepLink: URL {
+        StToolDestination(tool: self).url
+    }
+}

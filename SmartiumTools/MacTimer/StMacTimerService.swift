@@ -313,5 +313,15 @@ extension StMacTimerService: UNUserNotificationCenterDelegate {
         let ringer = await MainActor.run { limitimer.ringer }
         return ringer == .system ? [.banner, .list, .sound] : [.banner, .list]
     }
+
+    /// v0.8: clicking the notification opens the window on the Timer tab.
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        await MainActor.run {
+            _ = NSWorkspace.shared.open(StToolDestination.timer.url)
+        }
+    }
 }
 #endif

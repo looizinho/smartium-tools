@@ -36,6 +36,8 @@ struct SmartiumTimerLiveActivityWidget: Widget {
             SmartiumTimerBannerView(state: context.state, tool: tool)
                 .activityBackgroundTint(Color.black.opacity(0.9))
                 .activitySystemActionForegroundColor(tool.tone)
+                // v0.8: always open on the owning tool's tab.
+                .widgetURL(tool.deepLink)
         } dynamicIsland: { context in
             let tool = context.attributes.metadata?.tool ?? .timer
             return DynamicIsland {
@@ -75,6 +77,7 @@ struct SmartiumTimerLiveActivityWidget: Widget {
                 SmartiumIslandIcon(tool: tool, size: 22)
             }
             .keylineTint(tool.tone)
+            .widgetURL(tool.deepLink)
         }
     }
 }
