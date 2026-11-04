@@ -71,6 +71,7 @@ final class StSettingsStore {
     didSet {
       guard settings != oldValue else { return }
       writeCache()
+      StLiveSurfaces.publishPinnedMetric(settings.monitor.pinnedMetric)
       if !isApplyingICloud {
         pushToICloud()
       }
@@ -88,6 +89,7 @@ final class StSettingsStore {
     let folder = base?.appendingPathComponent(Bundle.main.bundleIdentifier ?? "SmartiumTools", isDirectory: true)
     cacheURL = folder?.appendingPathComponent("settings.json")
     settings = Self.read(cacheURL) ?? StSettings()
+    StLiveSurfaces.publishPinnedMetric(settings.monitor.pinnedMetric)
   }
 
   /// `items` in `tabOrder`, then any item not listed, in its original order.

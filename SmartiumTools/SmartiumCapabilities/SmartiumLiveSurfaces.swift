@@ -31,6 +31,7 @@ nonisolated enum StLiveSurfaces {
         static let metrics = "dev.smartium.tools.metricsSnapshot"
         static let orbActivity = "dev.smartium.tools.orbActivityActive"
         static let pendingTool = "dev.smartium.tools.pendingTool"
+        static let pinnedMetric = "dev.smartium.tools.pinnedMetric"
     }
 
     private static var defaults: UserDefaults {
@@ -49,6 +50,30 @@ nonisolated enum StLiveSurfaces {
     static var metrics: StMetricsSnapshot? {
         get { read(Key.metrics) }
         set { write(newValue, Key.metrics) }
+    }
+
+    /// Metric pinned to the Monitor hero (`settings.monitor.pinnedMetric`, v0.6),
+    /// mirrored here so the small widget can default to it.
+    static var pinnedMetric: String? {
+        defaults.string(forKey: Key.pinnedMetric)
+    }
+
+    /// Stores the pinned metric and reloads the Monitor widgets when it changed.
+    static func publishPinnedMetric(_ value: String?) {
+        guard value != pinnedMetric else { return }
+        defaults.set(value, forKey: Key.pinnedMetric)
+        reloadMonitor()
+    }
+
+    /// Widget metric for the pinned one. Nothing pinned means CPU, like the
+    /// hero; battery has no widget ring, so it also falls back to CPU.
+    static var pinnedWidgetMetric: StWidgetMetric {
+        switch pinnedMetric {
+        case "memory": .memory
+        case "disk": .disk
+        case "gpu": .gpu
+        default: .cpu
+        }
     }
 
     // MARK: Orb
