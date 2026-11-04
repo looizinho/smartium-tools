@@ -31,18 +31,24 @@ nonisolated public struct LimitimerSettings: Codable, Hashable, Sendable {
 
     public var endMessage: String
     public var recents: [LimitimerRecent]
+    /// End sound on the Mac (v0.7). The iPhone ignores it and follows the
+    /// silent switch.
+    public var ringer: StTimerRinger
 
     enum CodingKeys: String, CodingKey {
         case endMessage = "end-message"
         case recents
+        case ringer
     }
 
     public init(
         endMessage: String = LimitimerSettings.defaultEndMessage,
-        recents: [LimitimerRecent] = []
+        recents: [LimitimerRecent] = [],
+        ringer: StTimerRinger = .system
     ) {
         self.endMessage = endMessage
         self.recents = Array(recents.prefix(Self.maximumRecents))
+        self.ringer = ringer
     }
 
     public init(from decoder: Decoder) throws {
@@ -50,6 +56,8 @@ nonisolated public struct LimitimerSettings: Codable, Hashable, Sendable {
         endMessage = try values.decodeIfPresent(String.self, forKey: .endMessage) ?? LimitimerSettings.defaultEndMessage
         recents = try values.decodeIfPresent([LimitimerRecent].self, forKey: .recents) ?? []
         recents = Array(recents.prefix(Self.maximumRecents))
+        // An unknown value (e.g. edited by hand) falls back to the system sound.
+        ringer = (try? values.decodeIfPresent(StTimerRinger.self, forKey: .ringer)) ?? .system
     }
 
     public func removingRecent(id: LimitimerRecent.ID) -> Self {
@@ -66,5 +74,38 @@ nonisolated public struct LimitimerSettings: Codable, Hashable, Sendable {
         var settings = self
         settings.recents = Array(([recent] + existing).prefix(Self.maximumRecents))
         return settings
+    }
+}
+
+/// Timer end sound on the Mac (`settings.limitimer.ringer`, handoff v0.7 §3).
+nonisolated public enum StTimerRinger: String, Codable, CaseIterable, Hashable, Sendable {
+    /// The notification's own sound.
+    case system
+    /// Short macOS sounds the app plays itself, only while it is open.
+    case glass, ping, pop, submarine, tink
+    case silent
+
+    public var title: String {
+        switch self {
+        case .system: "Padrão do sistema"
+        case .glass: "Vidro"
+        case .ping: "Ping"
+        case .pop: "Pop"
+        case .submarine: "Submarino"
+        case .tink: "Tink"
+        case .silent: "Silencioso"
+        }
+    }
+
+    /// macOS sound name for the app's own sounds.
+    public var soundName: String? {
+        switch self {
+        case .glass: "Glass"
+        case .ping: "Ping"
+        case .pop: "Pop"
+        case .submarine: "Submarine"
+        case .tink: "Tink"
+        case .system, .silent: nil
+        }
     }
 }

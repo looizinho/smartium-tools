@@ -17,6 +17,9 @@ struct AlarmKitView: View {
     var body: some View {
         #if canImport(AlarmKit) && os(iOS)
         AlarmKitViewContent()
+        #elseif os(macOS)
+        // v0.7: the Mac has its own timer, without AlarmKit.
+        MacTimerView()
         #else
         StAdaptiveToolLayout(tool: .timer, tag: "Timer") { size in
             StTimerRing(
@@ -84,8 +87,8 @@ struct StTimerRing: View {
     }
 }
 
-#if canImport(AlarmKit) && os(iOS)
-private nonisolated enum TimerFormat {
+/// Clock text: `mm:ss`, or `h:mm:ss` from 1 h.
+nonisolated enum TimerFormat {
     static func duration(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.rounded()))
         let hours = total / 3_600
@@ -102,7 +105,7 @@ private nonisolated enum TimerFormat {
 }
 
 /// Timer adjustments (v0.3 "ATALHOS"): add or remove time, no selected state.
-private struct TimerAdjustment: Hashable {
+struct TimerAdjustment: Hashable {
     let seconds: Int
     let color: StRGB
 
@@ -119,6 +122,8 @@ private struct TimerAdjustment: Hashable {
         TimerAdjustment(seconds: -600, color: StAccent.brand)
     ]
 }
+
+#if canImport(AlarmKit) && os(iOS)
 
 private struct AlarmKitViewContent: View {
     @State private var manager = AlarmKitManager()

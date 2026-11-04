@@ -39,5 +39,10 @@ struct SmartiumToolsApp: App {
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1180, height: 740)
         #endif
+
+        #if os(macOS)
+        // v0.7: the Mac timer's menu bar item, shown while a timer is active.
+        MacTimerMenuBar()
+        #endif
     }
 }
