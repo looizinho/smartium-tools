@@ -104,6 +104,8 @@ nonisolated enum StTool: String, CaseIterable, Hashable, Sendable {
     case fx
     /// Sky. Monitor tab (v0.3).
     case monitor
+    /// Magenta. Form tab (v0.9).
+    case form
 
     var rgb: StRGB {
         switch self {
@@ -112,6 +114,7 @@ nonisolated enum StTool: String, CaseIterable, Hashable, Sendable {
         case .timer: StRGB(hex: 0x3DDC9E)
         case .fx: StRGB(hex: 0xFFB547)
         case .monitor: StAccent.sky
+        case .form: StAccent.brand
         }
     }
 
@@ -134,6 +137,7 @@ nonisolated enum StTool: String, CaseIterable, Hashable, Sendable {
         case .timer: StAccent.sky
         case .fx: StTool.voice.rgb
         case .monitor: StTool.orb.rgb
+        case .form: StTool.orb.rgb
         }
     }
 
@@ -147,6 +151,8 @@ nonisolated enum StTool: String, CaseIterable, Hashable, Sendable {
         case .timer: "timer"
         case .fx: "camera.metering.spot"
         case .monitor: "gauge.with.needle"
+        // Closest SF Symbol to the v0.9 clipboard (rounded sheet, three lines).
+        case .form: "doc.plaintext"
         }
     }
 }
