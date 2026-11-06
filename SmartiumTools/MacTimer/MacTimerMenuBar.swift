@@ -17,6 +17,7 @@ struct MacTimerMenuBar: Scene {
     var body: some Scene {
         MenuBarExtra(isInserted: Binding(get: { service.isActive }, set: { _ in })) {
             MacTimerPopover(service: service)
+                .preferredColorScheme(.dark)
         } label: {
             // The system draws menu bar labels as templates, so the icon color
             // may not show; the paused state also dims the clock.
