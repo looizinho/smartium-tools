@@ -23,6 +23,7 @@ struct StDialRing<Center: View>: View {
   private let tickRadius: CGFloat
   private let halo: [Gradient.Stop]
   private let haloInset: CGFloat
+  private let animationDuration: Double
   private let center: Center
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -38,6 +39,7 @@ struct StDialRing<Center: View>: View {
     tickRadius: CGFloat = 37,
     halo: [Gradient.Stop],
     haloInset: CGFloat = 0.06,
+    animationDuration: Double = 0.6,
     @ViewBuilder center: () -> Center
   ) {
     self.size = size
@@ -49,6 +51,7 @@ struct StDialRing<Center: View>: View {
     self.tickRadius = tickRadius
     self.halo = halo
     self.haloInset = haloInset
+    self.animationDuration = animationDuration
     self.center = center()
   }
 
@@ -75,8 +78,8 @@ struct StDialRing<Center: View>: View {
         .stroke(ringColor, style: StrokeStyle(lineWidth: lineWidth * unit, lineCap: .round))
         .rotationEffect(.degrees(-90))
         .frame(width: 88 * unit, height: 88 * unit)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.6), value: fraction)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.6), value: ringColor)
+        .animation(reduceMotion ? nil : .easeInOut(duration: animationDuration), value: fraction)
+        .animation(reduceMotion ? nil : .easeInOut(duration: animationDuration), value: ringColor)
 
       Circle()
         .stroke(
