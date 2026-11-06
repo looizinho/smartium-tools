@@ -231,7 +231,7 @@ nonisolated enum StWidgetMetric: String, AppEnum, CaseIterable, Sendable {
 
 /// Tabs an intent can open; raw values match `ToolTab`.
 nonisolated enum StToolDestination: String, AppEnum, Sendable {
-    case orb, voice, timer, staging, monitor
+    case orb, voice, timer, staging, monitor, form
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Ferramenta"
     static let caseDisplayRepresentations: [StToolDestination: DisplayRepresentation] = [
@@ -240,6 +240,7 @@ nonisolated enum StToolDestination: String, AppEnum, Sendable {
         .timer: "Timer",
         .staging: "Staging",
         .monitor: "Monitor",
+        .form: "Formulário",
     ]
 }
 
@@ -269,6 +270,7 @@ nonisolated extension StToolDestination {
         case .timer: self = .timer
         case .fx: self = .staging
         case .monitor: self = .monitor
+        case .form: self = .form
         }
     }
 }

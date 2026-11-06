@@ -15,6 +15,7 @@ enum ToolTab: String, Hashable, CaseIterable {
   case timer
   case staging
   case monitor
+  case form
 
   var tool: StTool {
     switch self {
@@ -23,6 +24,7 @@ enum ToolTab: String, Hashable, CaseIterable {
     case .timer: .timer
     case .staging: .fx
     case .monitor: .monitor
+    case .form: .form
     }
   }
 
@@ -34,6 +36,7 @@ enum ToolTab: String, Hashable, CaseIterable {
     case .timer: "Timer"
     case .staging: "Staging"
     case .monitor: "Monitor"
+    case .form: "Formulário"
     }
   }
 
@@ -109,6 +112,7 @@ struct ContentView: View {
         case .timer: AlarmKitView()
         case .staging: StagingView()
         case .monitor: MonitorView()
+        case .form: FormView()
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -139,6 +143,10 @@ struct ContentView: View {
 
       Tab(value: ToolTab.monitor) {
         tabScreen { MonitorView() }
+      }
+
+      Tab(value: ToolTab.form) {
+        tabScreen { FormView() }
       }
     }
     .tint(selectedTab.tool.tone)

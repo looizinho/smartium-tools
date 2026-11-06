@@ -12,6 +12,7 @@ Base em SwiftUI para uma coleção de ferramentas. O objetivo é manter uma inte
 - Ajustes sincronizados entre dispositivos pelo iCloud Drive.
 - AlarmKit no iOS para alarmes com contagem regressiva, incluindo Ilha Dinâmica e Atividade ao Vivo.
 - No macOS, navegação na toolbar e título da janela oculto para evitar redundância.
+- Aba **Formulário** (`smartium://tool/form`): campos com validação ao sair do campo, máscara de telefone e progresso dos 7 obrigatórios no anel. Os valores ficam só em memória.
 
 A aba **Voice ring** é um espaço reservado. **AlarmKit** já agenda alarmes com contagem regressiva; alarmes recorrentes ainda não estão implementados.
 
@@ -48,7 +49,7 @@ O app lê `Documents/settings.json` no container `iCloud.dev.smartium.tools`, ap
 
 ```json
 {
-  "tabOrder": ["orb", "voice", "timer", "staging", "monitor"],
+  "tabOrder": ["orb", "voice", "timer", "staging", "monitor", "form"],
   "monitor": { "pinnedMetric": null, "interval": 1.0 },
   "limitimer": { "end-message": "Encerrado!", "recents": [] }
 }
