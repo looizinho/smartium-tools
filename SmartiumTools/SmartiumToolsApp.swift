@@ -10,6 +10,9 @@ import SwiftUI
 @main
 struct SmartiumToolsApp: App {
     @Environment(\.scenePhase) private var scenePhase
+    #if os(macOS)
+    @NSApplicationDelegateAdaptor(SmartiumAppDelegate.self) private var appDelegate
+    #endif
 
     var body: some Scene {
         WindowGroup {
@@ -19,10 +22,8 @@ struct SmartiumToolsApp: App {
                 #endif
                 // Default text font (v0.3): views without an explicit font use Nunito.
                 .font(StFont.body(17))
-                #if os(iOS)
-                // The design is dark-only.
+                // The design is dark-only, on every platform (v0.9.1).
                 .preferredColorScheme(.dark)
-                #endif
                 .tint(.purple)
                 .task {
                     _ = await ICloudSettings.loadLimitimer()
@@ -46,3 +47,13 @@ struct SmartiumToolsApp: App {
         #endif
     }
 }
+
+#if os(macOS)
+/// Forces Dark Aqua before any window opens (v0.9.1), so popovers, menus and
+/// the DatePicker calendar never follow a light system theme.
+final class SmartiumAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+    }
+}
+#endif
