@@ -123,6 +123,9 @@ struct StAdaptiveToolLayout<Hero: View, Controls: View>: View {
       }
       .scrollBounceBehavior(.basedOnSize)
       .scrollDismissesKeyboard(.interactively)
+      // v0.9.2: the header draws its own band; the system edge effect
+      // stacked a second, lighter block on top of it.
+      .scrollEdgeEffectHidden(true, for: .top)
       .safeAreaInset(edge: .top, spacing: 0) {
         stickyHeader(top: 8)
           .padding(.horizontal, StSpacing.screenMargin)
@@ -143,6 +146,7 @@ struct StAdaptiveToolLayout<Hero: View, Controls: View>: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.interactively)
+        .scrollEdgeEffectHidden(true, for: .top)
         .safeAreaInset(edge: .top, spacing: 0) {
           stickyHeader(top: 4)
         }

@@ -9,6 +9,12 @@
 
 import SwiftUI
 
+extension EnvironmentValues {
+    /// False on an iOS tab that is loaded but hidden (v0.9.2): animations,
+    /// sampling and the camera pause there. Always true elsewhere.
+    @Entry var stIsActiveTab = true
+}
+
 extension View {
     /// Adds the border beam over the card's existing stroke.
     func stBorderBeam(primary: Color, secondary: Color, cornerRadius: CGFloat = 28) -> some View {
@@ -31,12 +37,13 @@ private struct StBorderBeam: ViewModifier {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.stIsActiveTab) private var isActiveTab
     @State private var isVisible = false
 
     func body(content: Content) -> some View {
         content
             .overlay {
-                TimelineView(.animation(paused: reduceMotion || !isVisible || scenePhase != .active)) { context in
+                TimelineView(.animation(paused: reduceMotion || !isVisible || !isActiveTab || scenePhase != .active)) { context in
                     beam(angle: angle(at: context.date))
                 }
                 .allowsHitTesting(false)

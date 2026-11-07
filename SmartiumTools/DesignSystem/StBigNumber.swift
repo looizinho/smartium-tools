@@ -103,17 +103,33 @@ struct StBigNumber: View {
     if let dots = StDotGlyph.Pattern(character) {
       StDotGlyph(dots, size: size, color: color)
     } else if character.isNumber || character.isLetter {
-      Text(String(character))
-        .font(.custom(StFont.numberFontName, fixedSize: size))
-        .foregroundStyle(color)
-        .frame(width: character.isNumber ? size * 0.513 : nil, height: size)
+      maskedGlyph(
+        Text(String(character)).font(.custom(StFont.numberFontName, fixedSize: size)),
+        width: character.isNumber ? size * 0.513 : nil,
+        height: size
+      )
     } else {
       // Not in the font and no dot pattern: fall back to Nunito.
-      Text(String(character))
-        .font(StFont.body(size * 0.8, .bold))
-        .foregroundStyle(color)
-        .frame(height: size)
+      maskedGlyph(Text(String(character)).font(StFont.body(size * 0.8, .bold)), width: nil, height: size)
     }
+  }
+
+  /// Paints `color` through the glyph's alpha (v0.9.2). Since the Xcode 27.3
+  /// SDK, `Text` in Digital Dotted renders its digits black whatever its
+  /// `foregroundStyle`; as a mask only the glyph shape counts, so the color
+  /// can't be lost. The clear `Text` keeps the natural size when `width` is nil.
+  private func maskedGlyph(_ text: Text, width: CGFloat?, height: CGFloat) -> some View {
+    text
+      .foregroundStyle(.clear)
+      .fixedSize()
+      .frame(width: width, height: height)
+      .overlay {
+        color.mask {
+          text
+            .fixedSize()
+            .frame(width: width, height: height)
+        }
+      }
   }
 }
 

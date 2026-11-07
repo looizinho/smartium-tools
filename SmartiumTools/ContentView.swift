@@ -49,6 +49,10 @@ struct ContentView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.scenePhase) private var scenePhase
   @State private var selectedTab: ToolTab = .orb
+#if !os(macOS)
+  /// Tabs whose screen exists; filled on first visit (v0.9.2).
+  @State private var loadedTabs: Set<ToolTab> = []
+#endif
   private var settings = StSettingsStore.shared
 #if os(iOS)
   @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -105,18 +109,9 @@ struct ContentView: View {
     HStack(spacing: 0) {
       StSidebar(tabItems, selection: $selectedTab, tool: selectedTab.tool)
 
-      Group {
-        switch selectedTab {
-        case .orb: ThinkingOrbsView()
-        case .voice: VoiceRingView()
-        case .timer: AlarmKitView()
-        case .staging: StagingView()
-        case .monitor: MonitorView()
-        case .form: FormView()
-        }
-      }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .padding(.top, 40)
+      screen(for: selectedTab)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 40)
     }
     .foregroundStyle(Color.stTextPrimary)
     .background { screenBackground }
@@ -124,30 +119,24 @@ struct ContentView: View {
     .ignoresSafeArea(.container, edges: .top)
     .frame(minWidth: 1000, minHeight: 640)
 #else
-    TabView(selection: $selectedTab) {
-      Tab(value: ToolTab.orb) {
-        tabScreen { ThinkingOrbsView() }
+    // v0.9.2: own container instead of TabView. With six tabs the TabView
+    // moved the 5th and 6th into UIKit's "More" navigation stack (back
+    // button, swipe-back, empty list). Each screen is built on its first
+    // visit and then only hidden, so its state survives.
+    ZStack {
+      ForEach(ToolTab.allCases, id: \.self) { tab in
+        if loadedTabs.contains(tab) {
+          let isActive = tab == selectedTab
+          tabScreen { screen(for: tab) }
+            .opacity(isActive ? 1 : 0)
+            .allowsHitTesting(isActive)
+            .accessibilityHidden(!isActive)
+            .environment(\.stIsActiveTab, isActive)
+        }
       }
-
-      Tab(value: ToolTab.voice) {
-        tabScreen { VoiceRingView() }
-      }
-
-      Tab(value: ToolTab.timer) {
-        tabScreen { AlarmKitView() }
-      }
-
-      Tab(value: ToolTab.staging) {
-        tabScreen { StagingView() }
-      }
-
-      Tab(value: ToolTab.monitor) {
-        tabScreen { MonitorView() }
-      }
-
-      Tab(value: ToolTab.form) {
-        tabScreen { FormView() }
-      }
+    }
+    .onChange(of: selectedTab, initial: true) { _, tab in
+      loadedTabs.insert(tab)
     }
     .tint(selectedTab.tool.tone)
     .environment(\.stLayoutMode, layoutMode)
@@ -171,15 +160,26 @@ struct ContentView: View {
 #endif
   }
 
+  @ViewBuilder
+  private func screen(for tab: ToolTab) -> some View {
+    switch tab {
+    case .orb: ThinkingOrbsView()
+    case .voice: VoiceRingView()
+    case .timer: AlarmKitView()
+    case .staging: StagingView()
+    case .monitor: MonitorView()
+    case .form: FormView()
+    }
+  }
+
   private var screenBackground: some View {
     StScreenBackground(tool: selectedTab.tool, isLandscape: layoutMode != .portrait)
       .animation(reduceMotion ? nil : .easeInOut(duration: 0.5), value: selectedTab)
   }
 
 #if !os(macOS)
-  /// One tab page: shared background, native tab bar hidden, and room at the
-  /// bottom for the floating `StTabBar` in portrait. Each page draws its own
-  /// background so the glow is never covered by the TabView's page background.
+  /// One tab page: shared background and room at the bottom for the
+  /// floating `StTabBar` in portrait.
   private func tabScreen<Content: View>(@ViewBuilder content: () -> Content) -> some View {
     content()
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -188,7 +188,6 @@ struct ContentView: View {
       .safeAreaInset(edge: .bottom, spacing: 0) {
         Color.clear.frame(height: layoutMode == .portrait ? 54 : 0)
       }
-      .toolbarVisibility(.hidden, for: .tabBar)
   }
 #endif
 }
@@ -197,6 +196,7 @@ struct ContentView: View {
 
 struct ThinkingOrbsView: View {
   @Environment(\.scenePhase) private var scenePhase
+  @Environment(\.stIsActiveTab) private var isActiveTab
   @State private var currentState: OrbState = ToolSharedState.load().orbState
 #if canImport(ActivityKit) && os(iOS)
   private var liveActivityManager = LiveActivityManager.shared
@@ -210,6 +210,8 @@ struct ThinkingOrbsView: View {
         ThinkingOrb(
           state: currentState,
           size: .px64,
+          // Hidden iOS tab (v0.9.2): no animation clock.
+          paused: !isActiveTab,
           displaySize: size * 0.6
         )
         .contentShape(Circle())

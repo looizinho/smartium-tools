@@ -4,6 +4,7 @@ import SwiftUI
 #if os(iOS)
 struct StagingCameraView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.stIsActiveTab) private var isActiveTab
     @State private var cameraManager = CameraPreviewManager()
 
     var body: some View {
@@ -20,21 +21,22 @@ struct StagingCameraView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .stBorderBeam(.fx, cornerRadius: StRadius.card)
-        .task {
-            await cameraManager.startPreview()
-        }
-        .onChange(of: scenePhase) { _, newPhase in
-            Task {
-                if newPhase == .active {
-                    await cameraManager.startPreview()
-                } else {
-                    cameraManager.stopPreview()
-                }
+        // v0.9.2: the tab stays loaded while hidden, so the session follows
+        // the tab's visibility and the scene phase, not onAppear.
+        .task(id: shouldRun) {
+            if shouldRun {
+                await cameraManager.startPreview()
+            } else {
+                cameraManager.stopPreview()
             }
         }
         .onDisappear {
             cameraManager.stopPreview()
         }
+    }
+
+    private var shouldRun: Bool {
+        isActiveTab && scenePhase == .active
     }
 }
 #endif

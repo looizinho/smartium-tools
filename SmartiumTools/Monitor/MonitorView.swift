@@ -13,6 +13,7 @@ import SwiftUI
 struct MonitorView: View {
   @State private var model = StMonitorModel()
   @Environment(\.stLayoutMode) private var mode
+  @Environment(\.stIsActiveTab) private var isActiveTab
   private var store = StSettingsStore.shared
 
   private static let intervals: [Double] = [0.5, 1, 2, 5]
@@ -90,7 +91,9 @@ struct MonitorView: View {
         select: { store.settings.monitor.interval = $0 }
       )
     }
-    .task(id: interval) {
+    // Samples only while the tab is visible (v0.9.2).
+    .task(id: SamplingKey(interval: interval, isActive: isActiveTab)) {
+      guard isActiveTab else { return }
       await model.run(interval: interval)
     }
   }
@@ -310,4 +313,10 @@ private extension StPinnedMetric {
     case .battery: StTool.fx.tone
     }
   }
+}
+
+/// Restarts sampling when the interval or the tab's visibility changes.
+private struct SamplingKey: Equatable {
+  let interval: Double
+  let isActive: Bool
 }
