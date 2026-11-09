@@ -86,16 +86,56 @@ final class StMonitorModel {
   /// Saves the sample for the Monitor widgets and control (v0.5). Widgets
   /// reload at most once a minute; their own timeline refreshes every 15 min.
   private func publishSnapshot() {
-    StLiveSurfaces.metrics = StMetricsSnapshot(
+    let snapshot = StMetricsSnapshot(
       cpu: cpu.value,
       gpu: gpu.value,
       memory: memory.value.fraction,
       disk: disk.value.fraction,
-      updatedAt: .now
+      updatedAt: .now,
+      battery: battery?.value.level
     )
+    StLiveSurfaces.metrics = snapshot
+#if os(iOS)
+    // Live samples to an open watch app (v0.10).
+    StWatchSync.shared.metricsSampled(
+      snapshot,
+      detail: heroDetail(pinned: StSettingsStore.shared.settings.monitor.pinnedMetric)
+    )
+#endif
     if let lastWidgetReload, Date.now.timeIntervalSince(lastWidgetReload) < 60 { return }
     lastWidgetReload = .now
     StLiveSurfaces.reloadMonitor()
+  }
+
+  // MARK: Captions
+
+  /// Caption under the hero number for the pinned metric (nil: CPU), as on
+  /// the iPhone hero.
+  func heroDetail(pinned: String?) -> String {
+    switch pinned.flatMap(StPinnedMetric.init(rawValue:)) {
+    case .memory: Self.memorySubtitle(memory.value)
+    case .disk: Self.diskSubtitle(disk.value)
+    case .gpu: "Estimado"
+    case .battery: battery.map { $0.value.isCharging ? "Carregando" : "Na bateria" } ?? ""
+    case nil: "\(coreNames.count) núcleos"
+    }
+  }
+
+  nonisolated private static func decimal(_ value: Double, digits: Int) -> String {
+    String(format: "%.\(digits)f", value).replacingOccurrences(of: ".", with: ",")
+  }
+
+  /// "6,5 de 8 GB" (binary gigabytes, like the system's memory size).
+  static func memorySubtitle(_ reading: StCapacityReading) -> String {
+    let gib = 1_073_741_824.0
+    let total = reading.total / gib
+    let totalText = total.rounded() == total ? String(Int(total)) : decimal(total, digits: 1)
+    return "\(decimal(reading.used / gib, digits: 1)) de \(totalText) GB"
+  }
+
+  /// "362 de 512 GB" (decimal gigabytes, like storage sizes).
+  static func diskSubtitle(_ reading: StCapacityReading) -> String {
+    "\(Int((reading.used / 1e9).rounded())) de \(Int((reading.total / 1e9).rounded())) GB"
   }
 
   private func appendCores(_ cores: [Double], isSimulated: Bool) {

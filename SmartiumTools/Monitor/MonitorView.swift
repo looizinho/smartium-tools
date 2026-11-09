@@ -136,8 +136,8 @@ struct MonitorView: View {
   private var quadHero: some View {
     let rings: [(label: String, value: Double, subtitle: String, color: StRGB, isSimulated: Bool)] = [
       ("CPU", model.cpu.value, "\(model.coreNames.count) núcleos", StAccent.sky, model.cpu.isSimulated),
-      ("Memória", model.memory.value.fraction, Self.memorySubtitle(model.memory.value), StTool.orb.rgb, model.memory.isSimulated),
-      ("Disco", model.disk.value.fraction, Self.diskSubtitle(model.disk.value), StAccent.brand, model.disk.isSimulated),
+      ("Memória", model.memory.value.fraction, StMonitorModel.memorySubtitle(model.memory.value), StTool.orb.rgb, model.memory.isSimulated),
+      ("Disco", model.disk.value.fraction, StMonitorModel.diskSubtitle(model.disk.value), StAccent.brand, model.disk.isSimulated),
       ("GPU", model.gpu.value, "Estimado", StTool.timer.rgb, model.gpu.isSimulated)
     ]
     return LazyVGrid(
@@ -201,13 +201,13 @@ struct MonitorView: View {
     var gauges = [
       Gauge(
         metric: .memory, label: "Memória", value: model.memory.value.fraction,
-        subtitle: Self.memorySubtitle(model.memory.value),
+        subtitle: StMonitorModel.memorySubtitle(model.memory.value),
         color: StStatus(fraction: model.memory.value.fraction).tone,
         isSimulated: model.memory.isSimulated
       ),
       Gauge(
         metric: .disk, label: "Disco", value: model.disk.value.fraction,
-        subtitle: Self.diskSubtitle(model.disk.value),
+        subtitle: StMonitorModel.diskSubtitle(model.disk.value),
         color: StStatus(fraction: model.disk.value.fraction).tone,
         isSimulated: model.disk.isSimulated
       ),
@@ -266,19 +266,6 @@ struct MonitorView: View {
 
   nonisolated private static func decimal(_ value: Double, digits: Int) -> String {
     String(format: "%.\(digits)f", value).replacingOccurrences(of: ".", with: ",")
-  }
-
-  /// "6,5 de 8 GB" (binary gigabytes, like the system's memory size).
-  private static func memorySubtitle(_ reading: StCapacityReading) -> String {
-    let gib = 1_073_741_824.0
-    let total = reading.total / gib
-    let totalText = total.rounded() == total ? String(Int(total)) : decimal(total, digits: 1)
-    return "\(decimal(reading.used / gib, digits: 1)) de \(totalText) GB"
-  }
-
-  /// "362 de 512 GB" (decimal gigabytes, like storage sizes).
-  private static func diskSubtitle(_ reading: StCapacityReading) -> String {
-    "\(Int((reading.used / 1e9).rounded())) de \(Int((reading.total / 1e9).rounded())) GB"
   }
 
   private static func megabytes(_ bytesPerSecond: Double) -> String {

@@ -469,52 +469,6 @@ struct StCardBackground: View {
   }
 }
 
-// MARK: - StHalo
-
-/// Two-tone halo (v0.2): a radial of the tool color mixed with its secondary,
-/// an outer ring stroked in the tool color and an inner ring in the secondary.
-struct StHalo<Content: View>: View {
-  private let tool: StTool
-  private let size: CGFloat
-  private let content: Content
-
-  init(_ tool: StTool, size: CGFloat = 236, @ViewBuilder content: () -> Content) {
-    self.tool = tool
-    self.size = size
-    self.content = content()
-  }
-
-  var body: some View {
-    ZStack {
-      // CSS: inset -6%, radial-gradient(circle at 38% 36%, tone 38%, secondary 14% 48%, clear 70%).
-      Circle()
-        .fill(
-          RadialGradient(
-            stops: [
-              .init(color: tool.opacity(0.38), location: 0),
-              .init(color: tool.secondaryRGB.color(opacity: 0.14), location: 0.48),
-              .init(color: tool.opacity(0), location: 0.70)
-            ],
-            center: UnitPoint(x: 0.38, y: 0.36),
-            startRadius: 0,
-            endRadius: size * 1.12 * 0.62
-          )
-        )
-        .padding(-size * 0.06)
-      Circle()
-        .fill(tool.opacity(0.07))
-        .overlay(Circle().strokeBorder(tool.opacity(0.24), lineWidth: 1))
-        .padding(size * 0.07)
-      Circle()
-        .fill(tool.opacity(0.11))
-        .overlay(Circle().strokeBorder(tool.secondaryRGB.color(opacity: 0.30), lineWidth: 1))
-        .padding(size * 0.19)
-      content
-    }
-    .frame(width: size, height: size)
-  }
-}
-
 // MARK: - Screen background
 
 /// Two radials over `#0B0A10` (v0.2): the tool color at 30% and its secondary

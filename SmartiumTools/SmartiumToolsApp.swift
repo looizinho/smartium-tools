@@ -14,6 +14,13 @@ struct SmartiumToolsApp: App {
     @NSApplicationDelegateAdaptor(SmartiumAppDelegate.self) private var appDelegate
     #endif
 
+    init() {
+        #if os(iOS)
+        // Mirrors Voz, Timer and Monitor to the watch app (v0.10).
+        StWatchSync.shared.activate()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

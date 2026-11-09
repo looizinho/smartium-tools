@@ -2,98 +2,13 @@
 //  StMeters.swift
 //  SmartiumTools
 //
-//  Generic meter components (handoff v0.3): dial ring, gauge tile, heatmap,
-//  rate card, step meter and the SIM badge. No screen logic inside.
+//  Generic meter components (handoff v0.3): gauge tile, heatmap, rate card,
+//  step meter and the SIM badge. No screen logic inside. `StDialRing` moved
+//  to `Shared/StDialRing.swift` (v0.10), so the watch can use it.
 //  App-only: excluded from SmartiumWidgetsExtension.
 //
 
 import SwiftUI
-
-// MARK: - StDialRing
-
-/// Hero ring (SVG viewBox 100): radial halo, track + progress ring at r44,
-/// dotted tick ring inside, and any content in the center.
-struct StDialRing<Center: View>: View {
-  private let size: CGFloat
-  private let fraction: Double
-  private let ringColor: Color
-  private let trackColor: Color
-  private let tickColor: Color
-  private let lineWidth: CGFloat
-  private let tickRadius: CGFloat
-  private let halo: [Gradient.Stop]
-  private let haloInset: CGFloat
-  private let animationDuration: Double
-  private let center: Center
-
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-  /// `lineWidth` and `tickRadius` are in 1/100 of `size`; `haloInset` is a fraction of `size`.
-  init(
-    size: CGFloat,
-    fraction: Double,
-    ringColor: Color,
-    trackColor: Color,
-    tickColor: Color,
-    lineWidth: CGFloat = 5,
-    tickRadius: CGFloat = 37,
-    halo: [Gradient.Stop],
-    haloInset: CGFloat = 0.06,
-    animationDuration: Double = 0.6,
-    @ViewBuilder center: () -> Center
-  ) {
-    self.size = size
-    self.fraction = fraction
-    self.ringColor = ringColor
-    self.trackColor = trackColor
-    self.tickColor = tickColor
-    self.lineWidth = lineWidth
-    self.tickRadius = tickRadius
-    self.halo = halo
-    self.haloInset = haloInset
-    self.animationDuration = animationDuration
-    self.center = center()
-  }
-
-  var body: some View {
-    let unit = size / 100
-    ZStack {
-      Circle()
-        .fill(
-          RadialGradient(
-            stops: halo,
-            center: .center,
-            startRadius: 0,
-            endRadius: size * (1 + haloInset * 2) * 0.5
-          )
-        )
-        .padding(-size * haloInset)
-
-      Circle()
-        .stroke(trackColor, lineWidth: lineWidth * unit)
-        .frame(width: 88 * unit, height: 88 * unit)
-
-      Circle()
-        .trim(from: 0, to: min(max(fraction, 0), 1))
-        .stroke(ringColor, style: StrokeStyle(lineWidth: lineWidth * unit, lineCap: .round))
-        .rotationEffect(.degrees(-90))
-        .frame(width: 88 * unit, height: 88 * unit)
-        .animation(reduceMotion ? nil : .easeInOut(duration: animationDuration), value: fraction)
-        .animation(reduceMotion ? nil : .easeInOut(duration: animationDuration), value: ringColor)
-
-      Circle()
-        .stroke(
-          tickColor,
-          style: StrokeStyle(lineWidth: 1.6 * unit, lineCap: .round, dash: [0.1 * unit, 3.77 * unit])
-        )
-        .frame(width: tickRadius * 2 * unit, height: tickRadius * 2 * unit)
-
-      center
-        .frame(width: 70 * unit)
-    }
-    .frame(width: size, height: size)
-  }
-}
 
 // MARK: - StSimBadge
 

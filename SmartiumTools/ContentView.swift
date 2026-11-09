@@ -350,7 +350,8 @@ struct ThinkingOrbsView: View {
 // MARK: - Voice
 
 /// Voice modes (v0.2 "MODOS"). Visual placeholder only.
-private enum VoiceMode: CaseIterable {
+private enum VoiceMode: String, CaseIterable {
+  // Raw values go to the watch (v0.10).
   case dictation, translation, commands, notes
 
   var title: String {
@@ -397,9 +398,16 @@ struct VoiceRingView: View {
         label: \.title,
         color: \.color,
         isOn: { $0 == mode },
-        select: { mode = $0 }
+        select: select
       )
     }
+  }
+
+  private func select(_ newMode: VoiceMode) {
+    mode = newMode
+#if os(iOS)
+    StWatchSync.shared.voiceModeChanged(newMode.rawValue)
+#endif
   }
 }
 

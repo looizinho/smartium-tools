@@ -3,8 +3,9 @@
 //  SmartiumTools
 //
 //  Design tokens for the SmartiumTools design system (handoff v0.1).
-//  This file compiles into both the app and SmartiumWidgetsExtension, so
-//  colors are defined in sRGB code instead of an asset catalog.
+//  This file compiles into the app, SmartiumWidgetsExtension and the watch
+//  app (`Shared/`, v0.10), so colors are defined in sRGB code instead of an
+//  asset catalog.
 //
 
 import CoreText

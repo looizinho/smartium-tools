@@ -72,6 +72,12 @@ final class StSettingsStore {
       guard settings != oldValue else { return }
       writeCache()
       StLiveSurfaces.publishPinnedMetric(settings.monitor.pinnedMetric)
+#if os(iOS)
+      // The watch mirrors the order and the pinned metric (v0.10). Only a
+      // change made here is a user action that moves the watch's page.
+      StWatchSync.shared.tabOrderChanged(settings.tabOrder)
+      StWatchSync.shared.pinnedMetricChanged(settings.monitor.pinnedMetric, isUserAction: !isApplyingICloud)
+#endif
       if !isApplyingICloud {
         pushToICloud()
       }

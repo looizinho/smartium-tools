@@ -197,6 +197,7 @@ enum StTimerService {
     private static func save(_ snapshot: StTimerSnapshot) {
         StLiveSurfaces.timer = snapshot
         StLiveSurfaces.reloadTimer()
+        StWatchSync.shared.timerChanged(snapshot)
     }
 
     private static func localizedTitle(_ text: String) -> LocalizedStringResource {

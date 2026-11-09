@@ -55,6 +55,28 @@
       ],
     }, {
       "kind": "folder",
+      "path": "Shared",
+      "target-membership": [
+        "SmartiumTools",
+        "SmartiumWidgetsExtension",
+        "SmartiumWatch",
+      ],
+    }, {
+      "kind": "folder",
+      "path": "SmartiumWatch",
+      "target-membership": [
+        "SmartiumWatch",
+      ],
+      "membership-exceptions": [
+        {
+          "target": "SmartiumWatch",
+          "exclusions": [
+            "Info.plist",
+          ],
+        },
+      ],
+    }, {
+      "kind": "folder",
       "path": "SmartiumWidgets",
       "target-membership": [
         "SmartiumWidgetsExtension",
@@ -80,6 +102,7 @@
       "children": [
         { "path": "<PRODUCTS>/SmartiumTools.app", "id": "0EB6B689309115940044AE2C", "type": "wrapper.application", "index": false },
         { "path": "<PRODUCTS>/SmartiumWidgetsExtension.appex", "id": "0EB379C130915EC9001AEB6E", "type": "wrapper.app-extension", "index": false, "target-membership": [ { "build-phase": "SmartiumTools/copy/Embed Foundation Extensions", "header-preservation": "remove-on-copy" } ] },
+        { "path": "<PRODUCTS>/SmartiumWatch.app", "id": "0EC1A0012F00000000000002", "type": "wrapper.application", "index": false, "target-membership": [ { "build-phase": "SmartiumTools/copy/Embed Watch Content", "platforms": [ "ios" ] } ] },
       ],
     },
   ],
@@ -91,6 +114,7 @@
       "product-type": "application",
       "dependencies": [
         "SmartiumWidgetsExtension",
+        { "target": "SmartiumWatch", "platforms": [ "ios" ] },
       ],
       "build-phases": [
         "compile-sources",
@@ -100,6 +124,11 @@
           "kind": "copy",
           "name": "Embed Foundation Extensions",
           "bundle-base-path": "plugins-directory",
+        }, {
+          "kind": "copy",
+          "name": "Embed Watch Content",
+          "bundle-base-path": "build-products-directory",
+          "relative-path": "$(CONTENTS_FOLDER_PATH)/Watch",
         },
       ],
       "package-product-members": [
@@ -230,6 +259,43 @@
         "SWIFT_VERSION": "5.0",
         "TARGETED_DEVICE_FAMILY": "1,2",
         "XROS_DEPLOYMENT_TARGET": "27.2",
+      },
+    }, {
+      "name": "SmartiumWatch",
+      "id": "0EC1A0012F00000000000001",
+      "product": "Products/SmartiumWatch.app",
+      "product-type": "application",
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
+      "build-settings": {
+        "CODE_SIGN_STYLE": "Automatic",
+        "CURRENT_PROJECT_VERSION": "2",
+        "DEVELOPMENT_TEAM": "PBJKH22479",
+        "ENABLE_PREVIEWS": "YES",
+        "GENERATE_INFOPLIST_FILE": "YES",
+        "INFOPLIST_FILE": "SmartiumWatch/Info.plist",
+        "INFOPLIST_KEY_CFBundleDisplayName": "SmartiumTools",
+        "INFOPLIST_KEY_UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown",
+        "INFOPLIST_KEY_WKCompanionAppBundleIdentifier": "dev.smartium.SmartiumTools",
+        "INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp": "NO",
+        "LD_RUNPATH_SEARCH_PATHS": "@executable_path/Frameworks",
+        "MARKETING_VERSION": "1.0",
+        "PRODUCT_BUNDLE_IDENTIFIER": "dev.smartium.SmartiumTools.watchkitapp",
+        "PRODUCT_NAME": "$(TARGET_NAME)",
+        "SDKROOT": "watchos",
+        "SKIP_INSTALL": "YES",
+        "STRING_CATALOG_GENERATE_SYMBOLS": "YES",
+        "SUPPORTED_PLATFORMS": "watchos watchsimulator",
+        "SWIFT_APPROACHABLE_CONCURRENCY": "YES",
+        "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
+        "SWIFT_EMIT_LOC_STRINGS": "YES",
+        "SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY": "YES",
+        "SWIFT_VERSION": "5.0",
+        "TARGETED_DEVICE_FAMILY": "4",
+        "WATCHOS_DEPLOYMENT_TARGET": "27.2",
       },
     },
   ],
