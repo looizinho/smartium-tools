@@ -313,6 +313,7 @@ struct MacTimerView: View {
                     .background(Circle().fill(StTool.timer.opacity(0.16)))
             }
             .buttonStyle(StPressStyle())
+            .focusEffectDisabled()
             .accessibilityLabel("Iniciar \(TimerFormat.duration(recent.duration))")
         }
         .padding(10)

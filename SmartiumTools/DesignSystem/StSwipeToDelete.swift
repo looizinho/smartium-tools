@@ -47,6 +47,7 @@ struct StSwipeToDelete<Content: View>: View {
           .shadow(color: StTool.voice.opacity(0.35), radius: 9, y: 6)
       }
       .buttonStyle(.plain)
+      .focusEffectDisabled()
       .scaleEffect(0.6 + 0.4 * reveal)
       .opacity(reveal)
       .frame(width: -Self.openOffset)

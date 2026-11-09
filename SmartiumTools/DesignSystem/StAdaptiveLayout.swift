@@ -236,6 +236,7 @@ struct StDock<ID: Hashable>: View {
             .contentShape(Circle())
         }
         .buttonStyle(StPressStyle())
+        .focusEffectDisabled()
         .accessibilityLabel(current.title)
         .accessibilityHint("Mostra todas as ferramentas.")
         .transition(.opacity)
@@ -271,6 +272,7 @@ struct StDock<ID: Hashable>: View {
         .contentShape(Circle())
     }
     .buttonStyle(StPressStyle())
+    .focusEffectDisabled()
     .accessibilityLabel(item.title)
     .accessibilityAddTraits(isSelected ? .isSelected : [])
   }
@@ -298,6 +300,10 @@ struct StSidebar<ID: Hashable>: View {
   private let items: [StTabItem<ID>]
   @Binding private var selection: ID
   private let tool: StTool
+
+  /// Keyboard focus on the sidebar as a whole (v0.9.5). The system ring is
+  /// off; the selected row shows our own outline while this is true.
+  @FocusState private var isFocused: Bool
 
   init(_ items: [StTabItem<ID>], selection: Binding<ID>, tool: StTool) {
     self.items = items
@@ -331,10 +337,36 @@ struct StSidebar<ID: Hashable>: View {
         .fill(.white.opacity(0.06))
         .frame(width: 1)
     }
+    // One focusable element for the whole list: Tab enters and leaves it,
+    // ↑/↓ move the selection, and focus never sticks to a single row.
+    .focusable()
+    .focused($isFocused)
+    .focusEffectDisabled()
+#if os(macOS)
+    .onMoveCommand { direction in
+      switch direction {
+      case .up: move(by: -1)
+      case .down: move(by: 1)
+      default: break
+      }
+    }
+#endif
+    .onKeyPress(.space) { .handled }
+    .onKeyPress(.return) { .handled }
+    .accessibilityElement(children: .contain)
+  }
+
+  /// Previous or next item, without wrapping around.
+  private func move(by offset: Int) {
+    guard let index = items.firstIndex(where: { $0.id == selection }) else { return }
+    let next = index + offset
+    guard items.indices.contains(next) else { return }
+    selection = items[next].id
   }
 
   private func row(_ item: StTabItem<ID>) -> some View {
     let isSelected = item.id == selection
+    let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
     return Button {
       selection = item.id
     } label: {
@@ -354,13 +386,18 @@ struct StSidebar<ID: Hashable>: View {
       }
       .padding(.horizontal, 8)
       .frame(height: 48)
-      .background(
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-          .fill(isSelected ? item.tool.opacity(0.14) : .clear)
-      )
-      .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .background(shape.fill(isSelected ? item.tool.opacity(0.14) : .clear))
+      .overlay {
+        // Our focus indicator: only on the selected row, only with keyboard focus.
+        if isSelected && isFocused {
+          shape.strokeBorder(item.tool.opacity(0.6), lineWidth: 1.5)
+        }
+      }
+      .contentShape(shape)
     }
     .buttonStyle(.plain)
+    .focusable(false)
+    .focusEffectDisabled()
     .accessibilityAddTraits(isSelected ? .isSelected : [])
   }
 }

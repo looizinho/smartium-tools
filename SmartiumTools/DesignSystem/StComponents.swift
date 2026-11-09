@@ -73,6 +73,7 @@ struct StButton: View {
       }
     }
     .buttonStyle(StPressStyle())
+    .focusEffectDisabled()
     .accessibilityLabel(title.map { Text($0) } ?? Text(systemImage))
   }
   
@@ -357,6 +358,7 @@ struct StSegment<Item: Hashable>: View {
           .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
+      .focusEffectDisabled()
       .id(item)
       .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
@@ -635,6 +637,7 @@ struct StChip: View {
       .contentShape(Capsule())
     }
     .buttonStyle(StPressStyle())
+    .focusEffectDisabled()
     .accessibilityAddTraits(isOn ? .isSelected : [])
   }
 }

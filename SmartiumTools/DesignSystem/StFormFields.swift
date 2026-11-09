@@ -310,6 +310,7 @@ struct StSecureField: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()
         .accessibilityLabel(showsText ? "Ocultar senha" : "Mostrar senha")
       }
       .padding(.leading, 16)
@@ -584,6 +585,7 @@ struct StToggleRow: View {
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
+      .focusEffectDisabled()
     }
     .accessibilityRepresentation {
       Toggle(label, isOn: $isOn)
@@ -631,6 +633,7 @@ struct StColorSwatches: View {
       .contentShape(Circle())
     }
     .buttonStyle(StPressStyle())
+    .focusEffectDisabled()
     .accessibilityLabel(name)
     .accessibilityAddTraits(isSelected ? .isSelected : [])
   }
@@ -666,6 +669,7 @@ struct StRating: View {
               .contentShape(Rectangle())
           }
           .buttonStyle(StPressStyle())
+          .focusEffectDisabled()
         }
         Spacer(minLength: 0)
       }
