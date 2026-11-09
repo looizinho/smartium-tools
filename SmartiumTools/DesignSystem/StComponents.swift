@@ -744,9 +744,12 @@ struct StTabItem<ID: Hashable>: Identifiable {
 }
 
 /// Floating tab bar (v0.3): five visible slots, each 1/5 of the inner width.
-/// From the sixth item on it scrolls horizontally, and the active item is
-/// always scrolled to the center. Icons only (v0.4): 58 pt bar, 48 pt pill;
-/// the tool name stays as the accessibility label.
+/// From the sixth item on it scrolls horizontally. Icons only (v0.4): 58 pt
+/// bar, 48 pt pill; the tool name stays as the accessibility label.
+///
+/// v0.9.4: only the pill animates; the tab switch itself is instant. The bar
+/// scrolls only when the active item is not fully visible, by the minimum
+/// that brings it to the nearest edge, with the pill's own spring.
 struct StTabBar<ID: Hashable>: View {
   private let items: [StTabItem<ID>]
   @Binding private var selection: ID
@@ -756,38 +759,50 @@ struct StTabBar<ID: Hashable>: View {
 
   @Namespace private var namespace
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var position = ScrollPosition(idType: ID.self)
+  /// Index of the leftmost fully visible slot, kept in sync with manual drags.
+  @State private var firstVisible = 0
 
   init(_ items: [StTabItem<ID>], selection: Binding<ID>) {
     self.items = items
     self._selection = selection
   }
 
+  /// The pill's curve, also used when the bar has to scroll.
+  private var pillAnimation: Animation? {
+    reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.75)
+  }
+
   var body: some View {
     GeometryReader { proxy in
       let itemWidth = proxy.size.width / CGFloat(Self.visibleSlots)
-      ScrollViewReader { reader in
-        ScrollView(.horizontal) {
-          HStack(spacing: 0) {
-            ForEach(items) { item in
-              tabButton(item)
-                .frame(width: itemWidth)
-                .id(item.id)
-            }
-          }
-          .scrollTargetLayout()
-        }
-        .scrollIndicators(.hidden)
-        .scrollTargetBehavior(.viewAligned)
-        .scrollDisabled(items.count <= Self.visibleSlots)
-        .clipShape(Capsule())
-        .onAppear {
-          reader.scrollTo(selection, anchor: .center)
-        }
-        .onChange(of: selection) { _, newValue in
-          withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.35)) {
-            reader.scrollTo(newValue, anchor: .center)
+      ScrollView(.horizontal) {
+        HStack(spacing: 0) {
+          ForEach(items) { item in
+            tabButton(item)
+              .frame(width: itemWidth)
+              .id(item.id)
           }
         }
+        .scrollTargetLayout()
+        // Only the pill moves with the spring (matchedGeometryEffect).
+        .animation(pillAnimation, value: selection)
+      }
+      .scrollPosition($position)
+      .scrollIndicators(.hidden)
+      // Snapping for drags; programmatic scrolls already land on a slot.
+      .scrollTargetBehavior(.viewAligned)
+      .scrollDisabled(items.count <= Self.visibleSlots)
+      .clipShape(Capsule())
+      .onScrollGeometryChange(for: Int.self) { geometry in
+        guard itemWidth > 0 else { return 0 }
+        return Int((geometry.contentOffset.x / itemWidth).rounded())
+      } action: { _, index in
+        firstVisible = index
+      }
+      .onAppear { reveal(selection, animated: false) }
+      .onChange(of: selection) { _, newValue in
+        reveal(newValue, animated: true)
       }
     }
     .padding(5)
@@ -803,16 +818,37 @@ struct StTabBar<ID: Hashable>: View {
     .padding(.bottom, 22)
   }
 
+  /// Scrolls only if `id` is cut off or outside the bar, so it ends up fully
+  /// visible against the nearest edge.
+  private func reveal(_ id: ID, animated: Bool) {
+    guard items.count > Self.visibleSlots,
+          let index = items.firstIndex(where: { $0.id == id }) else { return }
+    let lastSlot = Self.visibleSlots - 1
+    let newFirst: Int
+    if index < firstVisible {
+      newFirst = index
+    } else if index > firstVisible + lastSlot {
+      newFirst = index - lastSlot
+    } else {
+      return
+    }
+    let target = min(max(newFirst, 0), items.count - Self.visibleSlots)
+    firstVisible = target
+    withAnimation(animated ? pillAnimation : nil) {
+      position.scrollTo(id: items[target].id, anchor: .leading)
+    }
+  }
+
+  private func select(_ item: StTabItem<ID>) {
+    // No withAnimation: the container swaps screens instantly (v0.9.4).
+    selection = item.id
+  }
+
   private func tabButton(_ item: StTabItem<ID>) -> some View {
     let isSelected = item.id == selection
-    return Button {
-      withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.75)) {
-        selection = item.id
-      }
-    } label: {
-      Image(systemName: item.systemImage)
-        .font(StFont.body(20, .semibold))
-        .frame(height: 24)
+    return Image(systemName: item.systemImage)
+      .font(StFont.body(20, .semibold))
+      .frame(height: 24)
       .foregroundStyle(isSelected ? Color.stInk900 : Color.stTextPrimary.opacity(0.7))
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .background {
@@ -824,10 +860,13 @@ struct StTabBar<ID: Hashable>: View {
         }
       }
       .contentShape(Capsule())
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(item.title)
-    .accessibilityAddTraits(isSelected ? .isSelected : [])
+      // Simultaneous with the scroll view, so a tap right after a drag
+      // selects on the first try instead of only stopping the deceleration.
+      .simultaneousGesture(TapGesture().onEnded { select(item) })
+      .accessibilityElement()
+      .accessibilityLabel(item.title)
+      .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+      .accessibilityAction { select(item) }
   }
 }
 
