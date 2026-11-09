@@ -204,11 +204,14 @@ struct StTextField: View {
   var normalize: ((String) -> String)?
   var validator: ((String) -> String?)?
   var validateOn: StValidateOn = .blur
+  /// Reports focus changes, so the form knows which field is focused (v0.9.3).
+  var onFocusChange: ((Bool) -> Void)?
 
   /// What the TextField shows. Kept apart from `text` so a mask that rejects
   /// a keystroke (the 12th phone digit) still redraws the field.
   @State private var draft = ""
   @FocusState private var isFocused: Bool
+  @Environment(\.stIsActiveTab) private var isActiveTab
 
   var body: some View {
     let error = visibleError(text, touched: touched, validator: validator)
@@ -242,9 +245,15 @@ struct StTextField: View {
       if draft != newValue { draft = newValue }
     }
     .onChange(of: isFocused) { wasFocused, focused in
+      onFocusChange?(focused)
       guard wasFocused, !focused, validateOn == .blur else { return }
       touched = true
       stAnnounceFieldError(validator?(text))
+    }
+    // A hidden iOS tab stays loaded (v0.9.2): let go of the keyboard there.
+    // Dropping focus also runs the blur above (v0.9.3).
+    .onChange(of: isActiveTab) { _, active in
+      if !active { isFocused = false }
     }
   }
 }
@@ -260,9 +269,12 @@ struct StSecureField: View {
   var hint: String?
   var validator: ((String) -> String?)?
   var validateOn: StValidateOn = .blur
+  /// Reports focus changes, so the form knows which field is focused (v0.9.3).
+  var onFocusChange: ((Bool) -> Void)?
 
   private enum Focus { case secure, plain }
   @FocusState private var focus: Focus?
+  @Environment(\.stIsActiveTab) private var isActiveTab
 
   var body: some View {
     let error = visibleError(text, touched: touched, validator: validator)
@@ -308,9 +320,13 @@ struct StSecureField: View {
       if validateOn == .change { touched = true }
     }
     .onChange(of: focus) { old, new in
+      if (old != nil) != (new != nil) { onFocusChange?(new != nil) }
       guard old != nil, new == nil, validateOn == .blur else { return }
       touched = true
       stAnnounceFieldError(validator?(text))
+    }
+    .onChange(of: isActiveTab) { _, active in
+      if !active { focus = nil }
     }
   }
 }
@@ -379,8 +395,9 @@ struct StSelect: View {
 
 /// Optional date (v0.9.1). The whole container is a button that opens a
 /// graphical calendar capped at `maximum`: a popover on the Mac and iPad, a
-/// sheet with detents on the iPhone. Picking a day saves it and closes;
-/// closing marks the field as touched (its blur).
+/// sheet on the iPhone. The calendar edits a draft (v0.9.3): OK saves it,
+/// Cancelar or dismissing discards it. Any close marks the field as touched
+/// (its blur).
 struct StDateField: View {
   let label: String
   @Binding var date: Date?
@@ -391,6 +408,9 @@ struct StDateField: View {
   var validator: ((Date?) -> String?)?
 
   @State private var isPresented = false
+  /// What the calendar edits while open; saved to `date` only by OK.
+  @State private var draft = Date.now
+  @Environment(\.stIsActiveTab) private var isActiveTab
 
   private static let display: DateFormatter = {
     let formatter = DateFormatter()
@@ -409,6 +429,7 @@ struct StDateField: View {
       isFocused: isPresented
     ) {
       Button {
+        draft = min(date ?? maximum, maximum)
         isPresented = true
       } label: {
         HStack(spacing: 8) {
@@ -441,26 +462,59 @@ struct StDateField: View {
       touched = true
       stAnnounceFieldError(validator?(date))
     }
+    // Do not leave the calendar open over another tab (v0.9.3).
+    .onChange(of: isActiveTab) { _, active in
+      if !active { isPresented = false }
+    }
   }
 
   private var calendar: some View {
-    let selection = Binding(
-      get: { date ?? maximum },
-      set: { newValue in
-        date = newValue
-        isPresented = false
+    VStack(spacing: 12) {
+      // Changing month, year or day only moves the draft: nothing closes.
+      DatePicker(label, selection: $draft, in: ...maximum, displayedComponents: .date)
+        .datePickerStyle(.graphical)
+        .labelsHidden()
+        .tint(Color.stBrand)
+
+      HStack {
+        Button {
+          isPresented = false
+        } label: {
+          Text("Cancelar")
+            .font(StFont.body(15, .semibold))
+            .foregroundStyle(Color.white.opacity(0.6))
+            .padding(.horizontal, 8)
+            .frame(height: 44)
+            .contentShape(Rectangle())
+        }
+        .keyboardShortcut(.cancelAction)
+
+        Spacer(minLength: 12)
+
+        Button {
+          date = draft
+          isPresented = false
+        } label: {
+          Text("OK")
+            .font(StFont.body(15, .bold))
+            .foregroundStyle(Color.stInk900)
+            .padding(.horizontal, 28)
+            .frame(height: 44)
+            .background(Capsule().fill(Color.stBrand))
+            .contentShape(Capsule())
+        }
+        .keyboardShortcut(.defaultAction)
       }
-    )
-    return DatePicker(label, selection: selection, in: ...maximum, displayedComponents: .date)
-      .datePickerStyle(.graphical)
-      .labelsHidden()
-      .tint(Color.stBrand)
-      .padding(16)
-      .frame(minWidth: 300)
-      .preferredColorScheme(.dark)
-      .presentationDetents([.medium])
-      .presentationCompactAdaptation(.sheet)
-      .presentationBackground(StFieldColor.card.color)
+      .buttonStyle(.plain)
+      .focusEffectDisabled()
+    }
+    .padding(16)
+    .frame(minWidth: 300)
+    .preferredColorScheme(.dark)
+    // Room for the whole calendar plus the buttons, without clipping.
+    .presentationDetents([.large])
+    .presentationCompactAdaptation(.sheet)
+    .presentationBackground(StFieldColor.card.color)
   }
 }
 

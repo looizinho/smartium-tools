@@ -12,6 +12,8 @@ import SwiftUI
 struct FormView: View {
   @Bindable private var model = StFormModel.shared
   @State private var section = StFormSection.text
+  /// The typed field that has focus, if any (v0.9.3).
+  @State private var focusedField: StFormField?
 
   var body: some View {
     StAdaptiveToolLayout(tool: .form, tag: ToolTab.form.title) { size in
@@ -33,7 +35,7 @@ struct FormView: View {
         label: \.title,
         color: \.color,
         isOn: { $0 == section },
-        select: { section = $0 }
+        select: select
       )
 
       sectionCard
@@ -69,7 +71,8 @@ struct FormView: View {
       touched: touched(.name),
       placeholder: "Como quer ser chamado",
       kind: .name,
-      validator: StFormRules.name
+      validator: StFormRules.name,
+      onFocusChange: focusChange(.name)
     )
     StTextField(
       label: "E-mail",
@@ -78,7 +81,8 @@ struct FormView: View {
       placeholder: "voce@exemplo.com",
       kind: .email,
       normalize: StFormRules.normalizeEmail,
-      validator: StFormRules.email
+      validator: StFormRules.email,
+      onFocusChange: focusChange(.email)
     )
     StTextField(
       label: "Telefone",
@@ -88,7 +92,8 @@ struct FormView: View {
       hint: "DDD + número",
       kind: .phone,
       mask: StFormRules.maskPhone,
-      validator: StFormRules.phone
+      validator: StFormRules.phone,
+      onFocusChange: focusChange(.phone)
     )
     StSecureField(
       label: "Senha",
@@ -97,7 +102,8 @@ struct FormView: View {
       showsText: $model.showsPassword,
       placeholder: "Crie uma senha",
       hint: "Mínimo de 8 caracteres, com letras e números",
-      validator: StFormRules.password
+      validator: StFormRules.password,
+      onFocusChange: focusChange(.password)
     )
   }
 
@@ -138,6 +144,30 @@ struct FormView: View {
       touched: touched(.rating),
       validator: StFormRules.rating
     )
+  }
+
+  // MARK: Focus
+
+  /// Switching sections removes the focused field without a blur, so mark it
+  /// as touched first (v0.9.3). Fields never visited stay neutral.
+  private func select(_ newSection: StFormSection) {
+    guard newSection != section else { return }
+    if let field = focusedField {
+      model.touched.insert(field)
+      stAnnounceFieldError(model.error(for: field))
+      focusedField = nil
+    }
+    section = newSection
+  }
+
+  private func focusChange(_ field: StFormField) -> (Bool) -> Void {
+    { isFocused in
+      if isFocused {
+        focusedField = field
+      } else if focusedField == field {
+        focusedField = nil
+      }
+    }
   }
 
   // MARK: Actions
