@@ -135,6 +135,9 @@ struct ContentView: View {
         }
       }
     }
+    // One background behind every tab (v0.9.4), as on the Mac, instead of
+    // one per loaded tab.
+    .background { screenBackground }
     .onChange(of: selectedTab, initial: true) { _, tab in
       loadedTabs.insert(tab)
     }
@@ -178,13 +181,12 @@ struct ContentView: View {
   }
 
 #if !os(macOS)
-  /// One tab page: shared background and room at the bottom for the
-  /// floating `StTabBar` in portrait.
+  /// One tab page: room at the bottom for the floating `StTabBar` in
+  /// portrait. The background sits once behind the container (v0.9.4).
   private func tabScreen<Content: View>(@ViewBuilder content: () -> Content) -> some View {
     content()
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
       .foregroundStyle(Color.stTextPrimary)
-      .background { screenBackground }
       .safeAreaInset(edge: .bottom, spacing: 0) {
         Color.clear.frame(height: layoutMode == .portrait ? 54 : 0)
       }

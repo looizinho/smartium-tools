@@ -133,21 +133,31 @@ private struct AlarmKitViewContent: View {
     @State private var limitimerSettings = LimitimerSettings()
     /// The recent row swiped open, if any.
     @State private var openRecentID: LimitimerRecent.ID?
+    @Environment(\.stIsActiveTab) private var isActiveTab
+
+    private func timerRing(size: CGFloat, at date: Date) -> some View {
+        let remaining = manager.remainingSeconds(at: date)
+        let total = manager.totalDuration ?? selectedDuration
+        return StTimerRing(
+            size: size,
+            fraction: remaining.map { total > 0 ? $0 / total : 0 } ?? 1,
+            label: remaining == nil ? "DEFINIDO" : "RESTANTE",
+            clock: TimerFormat.duration(remaining ?? selectedDuration),
+            status: ringStatus
+        )
+    }
 
     var body: some View {
         // The hero shows only while a timer runs or is paused (v0.4, iPhone).
         let isActive = activeAlarm?.state == .countdown || activeAlarm?.state == .paused
         StAdaptiveToolLayout(tool: .timer, tag: "Timer", showsHero: isActive) { size in
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                let remaining = manager.remainingSeconds(at: context.date)
-                let total = manager.totalDuration ?? selectedDuration
-                StTimerRing(
-                    size: size,
-                    fraction: remaining.map { total > 0 ? $0 / total : 0 } ?? 1,
-                    label: remaining == nil ? "DEFINIDO" : "RESTANTE",
-                    clock: TimerFormat.duration(remaining ?? selectedDuration),
-                    status: ringStatus
-                )
+            // Hidden iOS tab (v0.9.4): no 1 s clock; the ring is redrawn on return.
+            if isActiveTab {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    timerRing(size: size, at: context.date)
+                }
+            } else {
+                timerRing(size: size, at: .now)
             }
         } controls: {
             StToolHeader(

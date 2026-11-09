@@ -6,6 +6,11 @@
 //  stroke in the tool color fading into its secondary, plus a blurred glow in
 //  the secondary. One turn every 4.5 s; parked at 315° with Reduce Motion.
 //
+//  v0.9.4: no per-frame body. The gradients are drawn once, in a square
+//  larger than the card, and only that square turns (a rotation transform,
+//  so nothing is re-rendered or re-blurred). Fixed stroke masks cut out the
+//  border and the glow.
+//
 
 import SwiftUI
 
@@ -39,65 +44,87 @@ private struct StBorderBeam: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.stIsActiveTab) private var isActiveTab
     @State private var isVisible = false
+    /// The beam's position, in CSS conic degrees (0° = top, clockwise).
+    @State private var spin = Self.parkedAngle
+
+    private var isRunning: Bool {
+        !reduceMotion && isVisible && isActiveTab && scenePhase == .active
+    }
 
     func body(content: Content) -> some View {
         content
             .overlay {
-                TimelineView(.animation(paused: reduceMotion || !isVisible || !isActiveTab || scenePhase != .active)) { context in
-                    beam(angle: angle(at: context.date))
-                }
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+                beam
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
             .onAppear { isVisible = true }
             .onDisappear { isVisible = false }
+            .onChange(of: isRunning) { _, running in
+                update(running: running)
+            }
     }
 
-    /// The beam's position, in CSS conic degrees (0° = top, clockwise).
-    private func angle(at date: Date) -> Double {
-        guard !reduceMotion else { return Self.parkedAngle }
-        let progress = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: Self.period) / Self.period
-        return progress * 360
+    /// Parks at 315° when paused; otherwise turns forever from there.
+    private func update(running: Bool) {
+        var park = Transaction()
+        park.disablesAnimations = true
+        withTransaction(park) { spin = Self.parkedAngle }
+        guard running else { return }
+        withAnimation(.linear(duration: Self.period).repeatForever(autoreverses: false)) {
+            spin = Self.parkedAngle + 360
+        }
     }
 
-    private func beam(angle: Double) -> some View {
-        // AngularGradient starts at 3 o'clock; the prototype's conic gradient at 12.
-        let start = Angle.degrees(angle - 90)
-        return ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(
-                    AngularGradient(
-                        stops: [
-                            .init(color: .clear, location: 0),
-                            .init(color: .clear, location: 250 / 360),
-                            .init(color: primary.opacity(0.9), location: 310 / 360),
-                            .init(color: secondary, location: 345 / 360),
-                            .init(color: .clear, location: 1),
-                        ],
-                        center: .center,
-                        startAngle: start,
-                        endAngle: start + .degrees(360)
-                    ),
-                    lineWidth: 1.5
-                )
-            RoundedRectangle(cornerRadius: cornerRadius + 3, style: .continuous)
-                .strokeBorder(
-                    AngularGradient(
-                        stops: [
-                            .init(color: .clear, location: 0),
-                            .init(color: .clear, location: 280 / 360),
-                            .init(color: secondary, location: 340 / 360),
-                            .init(color: .clear, location: 1),
-                        ],
-                        center: .center,
-                        startAngle: start,
-                        endAngle: start + .degrees(360)
-                    ),
-                    lineWidth: 4
-                )
-                .padding(-3)
-                .blur(radius: 6)
-                .opacity(0.55)
+    private var beam: some View {
+        ZStack {
+            // Border: 1.5 pt.
+            rotatingGradient(stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .clear, location: 250 / 360),
+                .init(color: primary.opacity(0.9), location: 310 / 360),
+                .init(color: secondary, location: 345 / 360),
+                .init(color: .clear, location: 1),
+            ])
+            .mask {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(lineWidth: 1.5)
+            }
+
+            // Glow: 4 pt, 3 pt outside the card, blurred 6, at 55%.
+            rotatingGradient(stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .clear, location: 280 / 360),
+                .init(color: secondary, location: 340 / 360),
+                .init(color: .clear, location: 1),
+            ], margin: 12)
+            .mask {
+                RoundedRectangle(cornerRadius: cornerRadius + 3, style: .continuous)
+                    .strokeBorder(lineWidth: 4)
+                    .padding(-3)
+                    .blur(radius: 6)
+            }
+            .opacity(0.55)
+        }
+    }
+
+    /// A fixed angular gradient in a square whose side is the card's
+    /// diagonal (plus `margin` on each side, for the glow outside the card),
+    /// turned by `spin`. It overflows the card's frame unclipped; the mask
+    /// cuts it. Only the rotation changes while it runs.
+    private func rotatingGradient(stops: [Gradient.Stop], margin: CGFloat = 0) -> some View {
+        GeometryReader { proxy in
+            let side = (proxy.size.width * proxy.size.width + proxy.size.height * proxy.size.height).squareRoot() + margin * 2
+            // AngularGradient starts at 3 o'clock; the prototype's conic gradient at 12.
+            AngularGradient(
+                stops: stops,
+                center: .center,
+                startAngle: .degrees(-90),
+                endAngle: .degrees(270)
+            )
+            .frame(width: side, height: side)
+            .rotationEffect(.degrees(spin))
+            .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
         }
     }
 }
