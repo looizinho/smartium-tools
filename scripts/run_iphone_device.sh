@@ -29,7 +29,7 @@ fi
 project_dir="$(cd "$(dirname "$0")/.." && pwd)"
 project="$project_dir/SmartiumTools.xcodeproj"
 scheme="App Debug"
-bundle_id="dev.smartium.tests.SmartiumTools"
+bundle_id="dev.smartium.SmartiumTools"
 
 echo "==> Compilando \"$scheme\" para $device"
 xcodebuild -project "$project" -scheme "$scheme" \
