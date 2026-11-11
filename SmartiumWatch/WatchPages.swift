@@ -7,6 +7,7 @@
 //  reach; the Timer keeps counting locally from `fireDate`. With the screen
 //  dimmed (Always On) halos go, rings and numbers drop to 60% and motion stops.
 //  v0.10.1: label, number and caption sizes follow the diameter.
+//  v0.11: tapping the Monitor circle switches to the device batteries.
 //
 
 import SwiftUI
@@ -246,29 +247,90 @@ struct WatchMonitorPage: View {
     let store: StWatchStore
     let diameter: CGFloat
 
+    /// Local navigation (v0.11): nothing is sent to the iPhone.
+    @State private var showsDevices = false
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 5)) { context in
-            let monitor = store.state.monitor
-            let metric = StWatchMetric(pinned: monitor.pinned)
-            let value = monitor.snapshot.flatMap(metric.value(in:)) ?? 0
-            let percent = Int((value * 100).rounded())
             let isOffline = store.isDisconnected(at: context.date)
-            ring(metric: metric, value: value, percent: percent, detail: monitor.detail)
-                .opacity((isOffline ? 0.5 : 1) * (isLuminanceReduced ? 0.6 : 1))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(alignment: .bottom) {
-                    if isOffline { WatchOfflineBadge(since: store.receivedAt, now: context.date) }
+            ZStack {
+                if showsDevices {
+                    devicesView(isOffline: isOffline, now: context.date)
+                        .transition(.opacity)
+                } else {
+                    metricView(isOffline: isOffline, now: context.date)
+                        .transition(.opacity)
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(
-                    ["Monitor", metric.label, "\(percent) por cento",
-                     isOffline ? "sem iPhone, atualizado \(WatchOfflineBadge.ago(store.receivedAt, now: context.date, spoken: true))" : nil]
-                        .compactMap { $0 }
-                        .joined(separator: ", ")
-                )
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .onTapGesture { toggle() }
+            .overlay(alignment: .bottom) {
+                VStack(spacing: 3) {
+                    if isOffline { WatchOfflineBadge(since: store.receivedAt, now: context.date) }
+                    WatchViewDots(second: showsDevices)
+                }
+                .padding(.bottom, 2)
+                .allowsHitTesting(false)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(showsDevices
+                ? devicesLabel(isOffline: isOffline, now: context.date)
+                : metricLabel(isOffline: isOffline, now: context.date))
+            .accessibilityHint(showsDevices ? "Toque para ver as métricas" : "Toque para ver os dispositivos")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { toggle() }
         }
+    }
+
+    private func toggle() {
+        withAnimation(.easeInOut(duration: reduceMotion ? 0.2 : 0.3)) { showsDevices.toggle() }
+    }
+
+    private var dimming: Double { isLuminanceReduced ? 0.6 : 1 }
+
+    // MARK: Metric
+
+    private func metricView(isOffline: Bool, now: Date) -> some View {
+        let monitor = store.state.monitor
+        let metric = StWatchMetric(pinned: monitor.pinned)
+        let value = monitor.snapshot.flatMap(metric.value(in:)) ?? 0
+        return ring(metric: metric, value: value, percent: Int((value * 100).rounded()), detail: monitor.detail)
+            .opacity((isOffline ? 0.5 : 1) * dimming)
+    }
+
+    private func metricLabel(isOffline: Bool, now: Date) -> String {
+        let monitor = store.state.monitor
+        let metric = StWatchMetric(pinned: monitor.pinned)
+        let value = monitor.snapshot.flatMap(metric.value(in:)) ?? 0
+        return ["Monitor", metric.label, "\(Int((value * 100).rounded())) por cento", offlineLabel(isOffline, now)]
+            .compactMap { $0 }
+            .joined(separator: ", ")
+    }
+
+    // MARK: Devices (v0.11 §1.5)
+
+    private func devicesView(isOffline: Bool, now: Date) -> some View {
+        StDeviceRings(
+            devices: store.devices,
+            diameter: diameter,
+            numberScale: 0.085,
+            showsHalo: !isLuminanceReduced
+        )
+        .opacity((isOffline ? 0.5 : 1) * dimming)
+    }
+
+    private func devicesLabel(isOffline: Bool, now: Date) -> String {
+        let thisID = store.battery.id
+        let rows = StDeviceList.ringDevices(store.devices).map { $0.spoken(isThisDevice: $0.id == thisID) }
+        return (["Dispositivos"] + rows + [offlineLabel(isOffline, now)].compactMap { $0 })
+            .joined(separator: "; ")
+    }
+
+    private func offlineLabel(_ isOffline: Bool, _ now: Date) -> String? {
+        isOffline ? "sem iPhone, atualizado \(WatchOfflineBadge.ago(store.receivedAt, now: now, spoken: true))" : nil
     }
 
     private func ring(metric: StWatchMetric, value: Double, percent: Int, detail: String) -> some View {
@@ -298,6 +360,28 @@ struct WatchMonitorPage: View {
                     .minimumScaleFactor(0.8)
             }
         }
+    }
+}
+
+// MARK: - View dots
+
+/// Two dots at the foot of the Monitor page (v0.11): 4 pt tall, the active
+/// one 10 pt wide and white, the other 4 pt at 35%.
+private struct WatchViewDots: View {
+    let second: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            dot(isActive: !second)
+            dot(isActive: second)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func dot(isActive: Bool) -> some View {
+        Capsule()
+            .fill(Color.white.opacity(isActive ? 1 : 0.35))
+            .frame(width: isActive ? 10 : 4, height: 4)
     }
 }
 

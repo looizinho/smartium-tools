@@ -4,7 +4,7 @@
 //
 //  What the iPhone sends to the watch app through WatchConnectivity
 //  (handoff v0.10 §3). The watch is read-only: nothing flows back except a
-//  "hello" asking for the current state.
+//  "hello" asking for the current state and, since v0.11, its own battery.
 //
 
 import Foundation
@@ -17,6 +17,9 @@ nonisolated struct StWatchState: Codable, Sendable, Equatable {
     var monitor = Monitor()
     /// Last user action on one of these tools on the iPhone.
     var focus: Focus?
+    /// Every known device battery: the iPhone, the Mac and any other (v0.11).
+    /// Optional so a state cached by an older version still decodes.
+    var devices: [StDeviceBattery]?
     var sentAt = Date.now
 
     /// The tools the watch shows, in their default order.
@@ -118,6 +121,8 @@ nonisolated enum StWatchTransport {
     static let stateKey = "state"
     /// Message key the watch sends to ask for the current state.
     static let helloKey = "hello"
+    /// Key of the watch's encoded `StDeviceBattery`, watch to iPhone (v0.11).
+    static let batteryKey = "battery"
 
     static func encode(_ state: StWatchState) -> Data? {
         try? JSONEncoder().encode(state)
@@ -126,5 +131,14 @@ nonisolated enum StWatchTransport {
     static func decode(_ payload: [String: Any]) -> StWatchState? {
         guard let data = payload[stateKey] as? Data else { return nil }
         return try? JSONDecoder().decode(StWatchState.self, from: data)
+    }
+
+    static func encode(_ battery: StDeviceBattery) -> Data? {
+        try? JSONEncoder().encode(battery)
+    }
+
+    static func decodeBattery(_ payload: [String: Any]) -> StDeviceBattery? {
+        guard let data = payload[batteryKey] as? Data else { return nil }
+        return try? JSONDecoder().decode(StDeviceBattery.self, from: data)
     }
 }
