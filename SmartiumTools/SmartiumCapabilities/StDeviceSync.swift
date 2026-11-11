@@ -7,7 +7,9 @@
 //  `battery.<id>` and reads the other devices' entries. On iPhone it also
 //  takes the watch's entry from WatchConnectivity, publishes it for the Mac
 //  and sends the whole list back to the watch. Kept apart from the
-//  iCloud Drive `settings.json`.
+//  iCloud Drive `settings.json`. Since v0.12 it also hands the timer's
+//  key (`timer.state`) to `StTimerSync`, publishes the list to the App Group
+//  for the Dispositivos widget and, on iPhone, feeds the battery Live Activity.
 //
 //  App-only (iOS and macOS): the whole file is under `#if SMARTIUM_APP`.
 //
@@ -55,7 +57,6 @@ final class StDeviceSync {
     @ObservationIgnored private var lastWritten: [String: StDeviceBattery] = [:]
     @ObservationIgnored private var lastWriteDate: [String: Date] = [:]
     @ObservationIgnored private var pendingWrites: [String: Task<Void, Never>] = [:]
-    @ObservationIgnored private let writer = StBatteryWriter()
     @ObservationIgnored private let logger = Logger(subsystem: "dev.smartium.tools", category: "battery")
 
     private init() {
@@ -99,8 +100,31 @@ final class StDeviceSync {
         if hasICloud {
             NSUbiquitousKeyValueStore.default.synchronize()
             reloadCloud()
+            StTimerSync.shared.reload()
         }
         refreshLocal(isOpening: true)
+        publishSurfaces()
+#if os(iOS) && canImport(ActivityKit)
+        // The first list is the baseline for "started charging" (v0.12 §3.3).
+        StBatteryActivityManager.shared.devicesChanged(devices)
+#endif
+    }
+
+    /// The Hero's refresh button (v0.12 §1.5): reads this device's battery
+    /// and publishes it at once, then reads the other devices again.
+    func refreshNow() {
+        checkAccount()
+        let new = reading()
+        let changed = new != this
+        this = new
+        if hasICloud, !quotaExceeded {
+            pendingWrites[thisID]?.cancel()
+            pendingWrites[thisID] = nil
+            write(this)
+            NSUbiquitousKeyValueStore.default.synchronize()
+            reloadCloud()
+        }
+        if changed { devicesChanged() }
     }
 
     private func startObserving() {
@@ -181,9 +205,23 @@ final class StDeviceSync {
     }
 
     private func devicesChanged() {
+        let devices = devices
 #if os(iOS)
         StWatchSync.shared.devicesChanged(devices)
+#if canImport(ActivityKit)
+        StBatteryActivityManager.shared.devicesChanged(devices)
 #endif
+#endif
+        publishSurfaces(devices)
+    }
+
+    /// The list for the Dispositivos widget (v0.12 §3.2): the extension
+    /// can't read the key-value store, so the app copies it to the App Group.
+    private func publishSurfaces(_ devices: [StDeviceBattery]? = nil) {
+        let devices = devices ?? self.devices
+        guard devices != StLiveSurfaces.devices else { return }
+        StLiveSurfaces.devices = devices
+        StLiveSurfaces.reloadDevices()
     }
 
     // MARK: Key-value store
@@ -201,6 +239,7 @@ final class StDeviceSync {
         default:
             // Server change and the first sync (`InitialSyncChange`) alike.
             reloadCloud()
+            StTimerSync.shared.reload()
         }
     }
 
@@ -218,6 +257,7 @@ final class StDeviceSync {
         if hasICloud {
             NSUbiquitousKeyValueStore.default.synchronize()
             reloadCloud()
+            StTimerSync.shared.reload()
             publish(this, isOpening: true)
             watches.values.forEach { publish($0, isOpening: true) }
         }
@@ -286,7 +326,7 @@ final class StDeviceSync {
         guard hasICloud, !quotaExceeded, let data = try? JSONEncoder().encode(entry) else { return }
         lastWritten[entry.id] = entry
         lastWriteDate[entry.id] = .now
-        writer.write(data, forKey: Self.keyPrefix + entry.id)
+        StKeyValueWriter.shared.write(data, forKey: Self.keyPrefix + entry.id)
     }
 
     // MARK: Names
@@ -332,9 +372,12 @@ final class StDeviceSync {
 #endif
 }
 
-/// Writes to the key-value store off the main thread, in order.
-nonisolated private final class StBatteryWriter: Sendable {
-    private let queue = DispatchQueue(label: "dev.smartium.tools.batterySync", qos: .utility)
+/// Writes to the key-value store off the main thread, in order (batteries
+/// and, since v0.12, the timer).
+nonisolated final class StKeyValueWriter: Sendable {
+    static let shared = StKeyValueWriter()
+
+    private let queue = DispatchQueue(label: "dev.smartium.tools.keyValueSync", qos: .utility)
 
     func write(_ data: Data, forKey key: String) {
         queue.async {

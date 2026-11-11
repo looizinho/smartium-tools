@@ -65,17 +65,14 @@ public struct SmartiumOrbWidgetEntryView: View {
     /// The only widget today is the Orb's, so it is Íris.
     private let tone = StTool.orb.tone
 
-    private var isDark: Bool {
-        colorScheme == .dark
+    /// Theme shared with the other widgets (v0.12, `SmartiumWidgetChrome`).
+    private var theme: StWidgetTheme {
+        StWidgetTheme(colorScheme)
     }
 
-    private var primaryTextColor: Color {
-        isDark ? .white : Color(red: 0.10, green: 0.09, blue: 0.14)
-    }
+    private var primaryTextColor: Color { theme.primary }
 
-    private var secondaryTextColor: Color {
-        isDark ? .white.opacity(0.70) : Color(red: 0.10, green: 0.09, blue: 0.14).opacity(0.62)
-    }
+    private var secondaryTextColor: Color { theme.secondary }
 
     /// Deterministic instant derived from the entry timestamp and preset speed.
     private var frozenInstant: Double {
@@ -94,24 +91,7 @@ public struct SmartiumOrbWidgetEntryView: View {
                 smallLayout
             }
         }
-        .containerBackground(for: .widget) {
-            ZStack {
-                if isDark {
-                    Color.black.opacity(0.92)
-                } else {
-                    Color(red: 0.98, green: 0.97, blue: 1.00)
-                }
-                RadialGradient(
-                    colors: [
-                        tone.opacity(isDark ? 0.28 : 0.16),
-                        Color.clear
-                    ],
-                    center: .topTrailing,
-                    startRadius: 8,
-                    endRadius: 160
-                )
-            }
-        }
+        .stWidgetBackground(tone)
     }
 
     private var smallLayout: some View {
@@ -161,7 +141,7 @@ public struct SmartiumOrbWidgetEntryView: View {
             .padding(6)
             .background(
                 Circle()
-                    .fill(isDark ? .white.opacity(0.05) : tone.opacity(0.07))
+                    .fill(theme.plate(tone))
             )
 
             VStack(alignment: .leading, spacing: 6) {
@@ -194,7 +174,7 @@ public struct SmartiumOrbWidgetEntryView: View {
                         .font(StFont.body(11, .semibold))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Capsule().fill(tone.opacity(isDark ? 0.85 : 0.90)))
+                        .background(Capsule().fill(theme.button(tone)))
                         .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)

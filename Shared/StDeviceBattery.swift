@@ -13,7 +13,7 @@ import SwiftUI
 
 // MARK: - Model
 
-nonisolated struct StDeviceBattery: Codable, Sendable, Equatable, Identifiable {
+nonisolated struct StDeviceBattery: Codable, Sendable, Hashable, Identifiable {
     enum Kind: String, Codable, Sendable, CaseIterable {
         case iphone, watch, mac
     }
@@ -206,6 +206,49 @@ struct StDeviceIcon: View {
 }
 
 // MARK: - Concentric rings
+
+/// Rings only, for the widgets and the battery Live Activity (v0.12 §3.2):
+/// iPhone r 44, Apple Watch r 33, Mac r 22, stroke 7 in a 100-unit viewBox,
+/// one ring per kind; a missing kind has no ring and a device without a
+/// battery gets a full one. Low battery in Coral.
+struct StDeviceRingsMark: View {
+    /// Already ordered (`StDeviceList.ordered`); one ring per kind.
+    let devices: [StDeviceBattery]
+    /// Track color: the widget theme's, or the device color at 16%.
+    var track: Color? = nil
+
+    nonisolated static func radius(_ kind: StDeviceBattery.Kind) -> CGFloat {
+        switch kind {
+        case .iphone: 44
+        case .watch: 33
+        case .mac: 22
+        }
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let unit = min(proxy.size.width, proxy.size.height) / 100
+            ZStack {
+                ForEach(StDeviceList.ringDevices(devices)) { device in
+                    let size = Self.radius(device.kind) * 2 * unit
+                    let lineWidth = 7 * unit
+                    ZStack {
+                        Circle()
+                            .stroke(track ?? device.rgb.color(opacity: 0.16), lineWidth: lineWidth)
+                        Circle()
+                            .trim(from: 0, to: device.ringFraction)
+                            .stroke(device.levelRGB.color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                    }
+                    .frame(width: size, height: size)
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .accessibilityHidden(true)
+    }
+}
 
 /// Watch "Dispositivos" view and the Monitor hero's second view (§1.4.1,
 /// §1.5): one ring per kind in a 100-unit viewBox, stroke 6.5, track at 16%,

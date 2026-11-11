@@ -17,6 +17,7 @@ import WidgetKit
 nonisolated enum StLiveSurfaces {
     static let timerWidgetKind = "SmartiumTimerWidget"
     static let monitorWidgetKind = "SmartiumMonitorWidget"
+    static let devicesWidgetKind = "SmartiumDevicesWidget"
 
     enum ControlKind {
         static let orb = "dev.smartium.tools.control.orb"
@@ -32,6 +33,7 @@ nonisolated enum StLiveSurfaces {
         static let orbActivity = "dev.smartium.tools.orbActivityActive"
         static let pendingTool = "dev.smartium.tools.pendingTool"
         static let pinnedMetric = "dev.smartium.tools.pinnedMetric"
+        static let devices = "dev.smartium.tools.devices"
     }
 
     private static var defaults: UserDefaults {
@@ -66,14 +68,24 @@ nonisolated enum StLiveSurfaces {
     }
 
     /// Widget metric for the pinned one. Nothing pinned means CPU, like the
-    /// hero; battery has no widget ring, so it also falls back to CPU.
+    /// hero. Battery has a widget ring since v0.12.
     static var pinnedWidgetMetric: StWidgetMetric {
         switch pinnedMetric {
         case "memory": .memory
         case "disk": .disk
         case "gpu": .gpu
+        case "battery": .battery
         default: .cpu
         }
+    }
+
+    // MARK: Devices
+
+    /// Every device's battery as the app last saw it (v0.12 §3.2), already
+    /// ordered (`StDeviceList.ordered`, this device first).
+    static var devices: [StDeviceBattery] {
+        get { read(Key.devices) ?? [] }
+        set { write(newValue, Key.devices) }
     }
 
     // MARK: Orb
@@ -110,6 +122,12 @@ nonisolated enum StLiveSurfaces {
         #if canImport(WidgetKit)
         WidgetCenter.shared.reloadTimelines(ofKind: monitorWidgetKind)
         reloadControl(ControlKind.monitor)
+        #endif
+    }
+
+    static func reloadDevices() {
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadTimelines(ofKind: devicesWidgetKind)
         #endif
     }
 

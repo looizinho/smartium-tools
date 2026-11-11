@@ -5,7 +5,9 @@
 //  The Mac's timer, without AlarmKit (handoff v0.7). Counts down in the app,
 //  schedules a local notification for the end (UserNotifications), plays the
 //  chosen end sound (§3) and mirrors its state to `StLiveSurfaces.timer`.
-//  One timer per device: nothing syncs but recents, message and sound (§5).
+//  v0.12: one timer for every device. User actions and the end go to the
+//  other devices (`StTimerSync`); a timer another device wrote is adopted
+//  here (`adopt`). Recents, message and sound still sync through settings.
 //
 
 import SwiftUI
@@ -101,7 +103,7 @@ final class StMacTimerService: NSObject {
         snapshot.lastDuration = duration
         snapshot.message = message
         StLiveSurfaces.timer = snapshot
-        publish()
+        commit()
         startTicking()
         scheduleNotification()
     }
@@ -127,7 +129,7 @@ final class StMacTimerService: NSObject {
         case .idle:
             return
         }
-        publish()
+        commit()
     }
 
     /// Changes the remaining time without stopping, up to 2:00:00. Reaching 0
@@ -147,16 +149,65 @@ final class StMacTimerService: NSObject {
         } else {
             pausedRemaining = newRemaining
         }
-        publish()
+        commit()
     }
 
     func cancel() {
+        resetLocally()
+        commit()
+    }
+
+    private func resetLocally() {
         phase = .idle
         fireDate = nil
         pausedRemaining = nil
         stopTicking()
         removeNotification()
+    }
+
+    // MARK: Other devices (v0.12)
+
+    /// A newer timer from another device: the counter and the end
+    /// notification follow it, without writing back (§1.2–1.3).
+    func adopt(_ remote: StTimerSnapshot) {
+        message = remote.message
+        switch remote.phase {
+        case .alerting:
+            // The end: a timer still counting here finishes on its own and
+            // one already finished stays so. Only a paused one is out of step.
+            guard phase == .paused else { break }
+            resetLocally()
+        case .idle:
+            resetLocally()
+        case .running:
+            guard let remoteFireDate = remote.fireDate, remoteFireDate > .now else { break }
+            total = remote.total ?? remoteFireDate.timeIntervalSinceNow
+            originalDuration = total
+            now = .now
+            fireDate = remoteFireDate
+            pausedRemaining = nil
+            phase = .running
+            startTicking()
+            scheduleNotification()
+        case .paused:
+            stopTicking()
+            removeNotification()
+            pausedRemaining = remote.pausedRemaining ?? 0
+            total = remote.total ?? pausedRemaining ?? 0
+            originalDuration = total
+            fireDate = nil
+            phase = .paused
+        }
+        var snapshot = StLiveSurfaces.timer
+        snapshot.message = remote.message
+        snapshot.lastDuration = remote.lastDuration
+        StLiveSurfaces.timer = snapshot
         publish()
+    }
+
+    /// A user action or the end: saved, then sent to the other devices.
+    private func commit() {
+        StTimerSync.shared.publish(publish())
     }
 
     /// Plays a sound once, as the preview when the user picks it.
@@ -173,7 +224,7 @@ final class StMacTimerService: NSObject {
                 guard let self else { return }
                 self.now = .now
                 if self.phase == .running, let fireDate = self.fireDate, self.now >= fireDate {
-                    self.finish()
+                    self.finish(isLate: self.now.timeIntervalSince(fireDate) >= 5)
                     return
                 }
                 try? await Task.sleep(for: .milliseconds(250))
@@ -188,11 +239,22 @@ final class StMacTimerService: NSObject {
 
     /// The end with the app open: the screen shows "Encerrado!" and the
     /// chosen sound plays. The notification covers the app being closed.
-    private func finish() {
+    ///
+    /// Long past the end (the Mac slept, v0.12 §1.3): the notification
+    /// already went out, so there's no sound, and the key-value store is read
+    /// before anything is sent, since another device may have changed the
+    /// timer meanwhile.
+    private func finish(isLate: Bool = false) {
         phase = .alerting
         fireDate = nil
         tickTask = nil
-        publish()
+        guard !isLate else {
+            publish()
+            NSUbiquitousKeyValueStore.default.synchronize()
+            StTimerSync.shared.reload()
+            return
+        }
+        commit()
         playEndSound()
     }
 
@@ -292,7 +354,8 @@ final class StMacTimerService: NSObject {
     }
 
     /// Writes the state for the Timer widgets (§4).
-    private func publish() {
+    @discardableResult
+    private func publish() -> StTimerSnapshot {
         var snapshot = StLiveSurfaces.timer
         snapshot.phase = phase
         snapshot.fireDate = fireDate
@@ -300,6 +363,7 @@ final class StMacTimerService: NSObject {
         snapshot.total = total > 0 ? total : nil
         StLiveSurfaces.timer = snapshot
         StLiveSurfaces.reloadTimer()
+        return snapshot
     }
 }
 

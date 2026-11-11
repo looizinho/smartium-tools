@@ -478,9 +478,10 @@ private struct AlarmKitViewContent: View {
         )
         saveTimerSettings()
 
-        // The screen controls a single timer: a new start replaces the active one.
+        // The screen controls a single timer: a new start replaces the active
+        // one. The new timer is what goes to the other devices (v0.12).
         if let activeAlarm {
-            manager.cancel(activeAlarm)
+            manager.cancel(activeAlarm, commit: false)
         }
 
         Task {
@@ -555,10 +556,15 @@ private final class AlarmKitManager {
                 tint: tint,
                 startPaused: startPaused
             )
-            // Adjustments pass `ringTotal`; only a fresh start sets what widgets restart with.
-            if ringTotal == nil {
-                StTimerService.recordStart(duration: duration, message: message)
-            }
+            // Adjustments pass `ringTotal`; only a fresh start sets what
+            // widgets restart with. Either way the other devices follow (v0.12).
+            StTimerService.recordSchedule(
+                duration: duration,
+                message: message,
+                total: ringTotal ?? duration,
+                paused: startPaused,
+                isNew: ringTotal == nil
+            )
             scheduledDuration = duration
             ringTotalOverride = ringTotal
             lastMessage = message
@@ -571,14 +577,28 @@ private final class AlarmKitManager {
     }
 
     func toggle(_ alarm: Alarm) {
+        let now = Date.now
+        let remaining = remainingSeconds(at: now)
         do {
             switch alarm.state {
             case .paused:
                 try AlarmManager.shared.resume(id: alarm.id)
+                StTimerService.recordChange { snapshot in
+                    let left = remaining ?? snapshot.pausedRemaining ?? 0
+                    snapshot.phase = .running
+                    snapshot.fireDate = now.addingTimeInterval(left)
+                    snapshot.pausedRemaining = nil
+                }
             case .alerting:
                 try AlarmManager.shared.stop(id: alarm.id)
+                StTimerService.recordChange { $0.phase = .idle }
             default:
                 try AlarmManager.shared.pause(id: alarm.id)
+                StTimerService.recordChange { snapshot in
+                    snapshot.phase = .paused
+                    snapshot.pausedRemaining = remaining ?? snapshot.remaining(at: now)
+                    snapshot.fireDate = nil
+                }
             }
 
             refresh()
@@ -597,23 +617,34 @@ private final class AlarmKitManager {
         // Already at the limit: nothing to reschedule.
         guard newRemaining != remaining.rounded(.up) else { return }
         let wasPaused = alarm.state == .paused
-        cancel(alarm)
+        cancel(alarm, commit: newRemaining <= 0)
         guard newRemaining > 0 else {
             ringTotalOverride = nil
             return
         }
+        // The message of the shared timer, which may come from another device.
+        let message = StLiveSurfaces.timer.message
         await scheduleTimer(
             duration: newRemaining,
             tint: lastTint,
-            message: lastMessage,
+            message: message.isEmpty ? lastMessage : message,
             ringTotal: max(total, newRemaining),
             startPaused: wasPaused
         )
     }
 
-    func cancel(_ alarm: Alarm) {
+    /// `commit: false` when a new timer replaces this one right away, so the
+    /// other devices only see the new one (v0.12).
+    func cancel(_ alarm: Alarm, commit: Bool = true) {
         do {
             try AlarmManager.shared.cancel(id: alarm.id)
+            if commit {
+                StTimerService.recordChange { snapshot in
+                    snapshot.phase = .idle
+                    snapshot.fireDate = nil
+                    snapshot.pausedRemaining = nil
+                }
+            }
             refresh()
         } catch {
             lastErrorMessage = error.localizedDescription
@@ -673,6 +704,10 @@ private final class AlarmKitManager {
 
     /// Total duration of the active countdown, from AlarmKit's presentation state.
     var totalDuration: TimeInterval? {
+        // A timer adopted from another device keeps that device's total (v0.12).
+        if let adopted = StTimerService.adoptedRingTotal, activeAlarmExists {
+            return adopted
+        }
         if let ringTotalOverride, activeAlarmExists {
             return ringTotalOverride
         }

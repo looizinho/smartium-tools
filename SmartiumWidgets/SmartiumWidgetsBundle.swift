@@ -13,8 +13,10 @@ struct SmartiumWidgetsBundle: WidgetBundle {
     var body: some Widget {
         SmartiumOrbWidget()
         SmartiumMonitorWidget()
+        SmartiumDevicesWidget()
         #if canImport(ActivityKit) && os(iOS)
         SmartiumLiveActivityWidget()
+        SmartiumBatteryActivityWidget()
         #endif
         #if canImport(AlarmKit) && os(iOS)
         SmartiumTimerLiveActivityWidget()
