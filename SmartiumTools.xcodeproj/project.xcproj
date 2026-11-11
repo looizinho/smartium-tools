@@ -53,15 +53,9 @@
           ],
         },
       ],
-    }, {
-      "kind": "folder",
-      "path": "Shared",
-      "target-membership": [
-        "SmartiumTools",
-        "SmartiumWidgetsExtension",
-        "SmartiumWatch",
-      ],
-    }, {
+    },
+    { "kind": "folder", "path": "Shared", "target-membership": [ "SmartiumTools", "SmartiumWatch", "SmartiumWidgetsExtension" ] },
+    {
       "kind": "folder",
       "path": "SmartiumWatch",
       "target-membership": [
