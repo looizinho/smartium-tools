@@ -7,8 +7,8 @@
 //  on a path, so each glyph is drawn on its own: measured, placed by arc
 //  length along the path and turned to its tangent.
 //
-//  The path runs 9 pt from the edges: up the left edge, around the corner on
-//  an arc of radius `cornerRadius − 9`, then along the top edge. The text is
+//  The path runs 13 pt from the edges: up the left edge, around the corner on
+//  an arc of radius `cornerRadius − 13`, then along the top edge. The text is
 //  centered on the middle of the arc, tops facing out of the screen.
 //
 
@@ -21,7 +21,7 @@ struct StCornerLabel: View {
     /// ≈ 38 pt on 44 mm, ≈ 34 pt on 40 mm.
     var cornerRadius: CGFloat?
 
-    static let inset: CGFloat = 9
+    static let inset: CGFloat = 13
     static let tracking: CGFloat = 1.4
 
     var body: some View {
