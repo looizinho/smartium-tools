@@ -24,3 +24,6 @@ xcuserdata/
 .env.*
 !.env.example
 !.env.sample
+
+# Claude Design handoffs: local backup, outside git (CLAUDE.md)
+/design/
