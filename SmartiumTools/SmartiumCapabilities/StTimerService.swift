@@ -5,6 +5,8 @@
 //  Schedules the Limitimer timer with AlarmKit and keeps `StLiveSurfaces.timer`
 //  current for the Timer widgets and control (handoff v0.5). Used by the Timer
 //  screen and by the timer intents, which run in the app process.
+//  v0.12: user actions go to the other devices (`commit`, `StTimerSync`),
+//  and a timer another device wrote is adopted here (`adopt`).
 //
 
 import SwiftUI
@@ -22,6 +24,10 @@ enum StTimerService {
             "O AlarmKit precisa estar autorizado para agendar timers."
         }
     }
+
+    /// Ring total of a timer adopted from another device: AlarmKit only
+    /// knows the remaining time it was scheduled with (v0.12).
+    static var adoptedRingTotal: TimeInterval?
 
     /// The timer the app shows: counting, paused or ringing.
     static var activeAlarm: Alarm? {
@@ -58,6 +64,7 @@ enum StTimerService {
             tintColor: tint
         )
         let id = UUID()
+        adoptedRingTotal = nil
         _ = try await AlarmManager.shared.schedule(
             id: id,
             configuration: .timer(duration: duration, attributes: attributes, stopIntent: StopTimerIntent())
@@ -99,7 +106,7 @@ enum StTimerService {
             return
         }
         snapshot.total = snapshot.total ?? liveTotal()
-        save(snapshot)
+        commit(snapshot)
     }
 
     /// The system alert's stop button already stopped the alarm.
@@ -107,7 +114,7 @@ enum StTimerService {
         var snapshot = StLiveSurfaces.timer
         guard snapshot.phase != .idle else { return }
         snapshot.phase = .idle
-        save(snapshot)
+        commit(snapshot)
     }
 
     /// Remaining time from AlarmKit's Live Activity, which is current even
@@ -152,18 +159,39 @@ enum StTimerService {
         var snapshot = StLiveSurfaces.timer
         snapshot.phase = .running
         snapshot.fireDate = Date.now.addingTimeInterval(duration)
+        snapshot.pausedRemaining = nil
         snapshot.total = duration
-        save(snapshot)
+        commit(snapshot)
     }
 
     // MARK: Snapshot
 
-    /// A new timer from the Timer screen: widgets restart with this duration.
-    static func recordStart(duration: TimeInterval, message: String) {
+    /// The Timer screen scheduled a timer: a new one (`isNew`, which widgets
+    /// restart with) or an adjustment, which keeps the ring's `total`.
+    static func recordSchedule(
+        duration: TimeInterval,
+        message: String,
+        total: TimeInterval,
+        paused: Bool,
+        isNew: Bool
+    ) {
         var snapshot = StLiveSurfaces.timer
-        snapshot.lastDuration = duration
+        if isNew {
+            snapshot.lastDuration = duration
+        }
         snapshot.message = message
-        save(snapshot)
+        snapshot.phase = paused ? .paused : .running
+        snapshot.fireDate = paused ? nil : Date.now.addingTimeInterval(duration)
+        snapshot.pausedRemaining = paused ? duration : nil
+        snapshot.total = total
+        commit(snapshot)
+    }
+
+    /// A user action on the Timer screen that AlarmKit already applied.
+    static func recordChange(_ change: (inout StTimerSnapshot) -> Void) {
+        var snapshot = StLiveSurfaces.timer
+        change(&snapshot)
+        commit(snapshot)
     }
 
     /// Mirrors the Timer screen's state; writes only when something changed.
@@ -191,6 +219,77 @@ enum StTimerService {
         guard current.phase != snapshot.phase || current.total != snapshot.total
                 || (snapshot.phase == .running && !sameFireDate)
                 || (snapshot.phase == .paused && !samePaused) else { return }
+        save(snapshot)
+
+        // v0.12: changes this app didn't make itself also go to the other
+        // devices: pause and resume from the system's countdown buttons, and
+        // the end. Never right after an adoption, which is still settling.
+        let fromSystem = (current.phase == .running && snapshot.phase == .paused)
+            || (current.phase == .paused && snapshot.phase == .running)
+            || (current.phase != .alerting && snapshot.phase == .alerting)
+        if fromSystem, !StTimerSync.shared.isSettling {
+            StTimerSync.shared.publish(snapshot)
+        }
+    }
+
+    // MARK: Other devices (v0.12)
+
+    /// A user action (or the end) here: saved, then sent to the other devices.
+    static func commit(_ snapshot: StTimerSnapshot) {
+        save(snapshot)
+        StTimerSync.shared.publish(snapshot)
+    }
+
+    /// A newer timer from another device: AlarmKit is set to match it, then
+    /// the snapshot is saved without writing back (§1.2–1.3).
+    static func adopt(_ remote: StTimerSnapshot) async {
+        let alarm = activeAlarm
+        var snapshot = StLiveSurfaces.timer
+        snapshot.message = remote.message
+        snapshot.lastDuration = remote.lastDuration
+
+        switch remote.phase {
+        case .alerting:
+            // The end: a timer still counting here rings on its own, and one
+            // already ringing keeps ringing. Only a paused one is out of step.
+            guard alarm?.state == .paused, let alarm else {
+                StLiveSurfaces.timer = snapshot
+                return
+            }
+            try? AlarmManager.shared.cancel(id: alarm.id)
+            snapshot.phase = .idle
+            snapshot.fireDate = nil
+            snapshot.pausedRemaining = nil
+        case .idle:
+            if let alarm {
+                try? AlarmManager.shared.cancel(id: alarm.id)
+            }
+            snapshot.phase = .idle
+            snapshot.fireDate = nil
+            snapshot.pausedRemaining = nil
+        case .running, .paused:
+            let remaining = remote.remaining(at: .now)
+            guard remaining >= 1 else { return }
+            let isSame = alarm != nil && StLiveSurfaces.timer.phase == remote.phase
+                && abs((StLiveSurfaces.timer.fireDate ?? .distantPast).timeIntervalSince(remote.fireDate ?? .distantPast)) < 1
+                && abs((StLiveSurfaces.timer.pausedRemaining ?? -1) - (remote.pausedRemaining ?? -1)) < 1
+            if !isSame {
+                if let alarm {
+                    try? AlarmManager.shared.cancel(id: alarm.id)
+                }
+                do {
+                    try await schedule(duration: remaining, message: remote.message, startPaused: remote.phase == .paused)
+                } catch {
+                    // No AlarmKit permission: the snapshot still follows, so
+                    // widgets and the watch show the shared timer.
+                }
+            }
+            snapshot.phase = remote.phase
+            snapshot.fireDate = remote.phase == .running ? remote.fireDate : nil
+            snapshot.pausedRemaining = remote.phase == .paused ? remaining : nil
+            snapshot.total = remote.total
+            adoptedRingTotal = remote.total
+        }
         save(snapshot)
     }
 

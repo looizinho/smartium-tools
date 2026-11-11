@@ -67,14 +67,27 @@ nonisolated struct StMetricsSnapshot: Codable, Sendable, Equatable {
     var updatedAt: Date
     /// Battery level, 0–1 (v0.10). Optional so older data still decodes.
     var battery: Double? = nil
+    /// Charging, for the battery widget's low color (v0.12).
+    var batteryCharging: Bool? = nil
+    /// CPU cores and the sampling interval, for the widget caption (v0.12).
+    var cores: Int? = nil
+    var interval: Double? = nil
 
-    func value(_ metric: StWidgetMetric) -> Double {
+    /// The metric as 0–1; nil only for the battery of a Mac without one.
+    func value(_ metric: StWidgetMetric) -> Double? {
         switch metric {
         case .cpu: cpu
         case .gpu: gpu
         case .memory: memory
         case .disk: disk
+        case .battery: battery
         }
+    }
+
+    /// Battery at 20% or less and not charging (§3.1): Coral, as in the app.
+    var isBatteryLow: Bool {
+        guard let battery, batteryCharging != true else { return false }
+        return battery <= 0.2
     }
 
     static let placeholder = StMetricsSnapshot(cpu: 0.32, gpu: 0.18, memory: 0.64, disk: 0.71, updatedAt: .now)
@@ -82,7 +95,7 @@ nonisolated struct StMetricsSnapshot: Codable, Sendable, Equatable {
 
 /// Metric shown by the small Monitor widget ("Editar widget").
 nonisolated enum StWidgetMetric: String, AppEnum, CaseIterable, Sendable {
-    case cpu, gpu, memory, disk
+    case cpu, gpu, memory, disk, battery
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Métrica"
     static let caseDisplayRepresentations: [StWidgetMetric: DisplayRepresentation] = [
@@ -90,15 +103,39 @@ nonisolated enum StWidgetMetric: String, AppEnum, CaseIterable, Sendable {
         .gpu: "GPU",
         .memory: "RAM",
         .disk: "Disco",
+        .battery: "Bateria",
     ]
 
-    /// Identity color of the metric (not a status color).
+    /// Identity color of the metric (not a status color). Battery is Âmbar,
+    /// like its ring in the app (v0.12).
     var rgb: StRGB {
         switch self {
         case .cpu: StAccent.sky
         case .gpu: StTool.timer.rgb
         case .memory: StTool.orb.rgb
         case .disk: StAccent.brand
+        case .battery: StTool.fx.rgb
+        }
+    }
+
+    /// Short name: "CPU", "GPU", "RAM", "Disco", "Bateria".
+    var label: String {
+        switch self {
+        case .cpu: "CPU"
+        case .gpu: "GPU"
+        case .memory: "RAM"
+        case .disk: "Disco"
+        case .battery: "Bateria"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .cpu: "cpu"
+        case .gpu: "square.stack.3d.up"
+        case .memory: "memorychip"
+        case .disk: "internaldrive"
+        case .battery: "battery.75percent"
         }
     }
 }

@@ -2,8 +2,11 @@
 //  SmartiumMonitorWidget.swift
 //  SmartiumWidgets
 //
-//  Monitor widgets (handoff v0.5): rings in each metric's identity color, no
-//  labels. Values are the app's last sample; GPU stays simulated on iOS.
+//  Monitor widgets. v0.12 §2: the Orb's layout and system theme, with the
+//  chosen metric's ring on the plate, "CPU 37%" and "Abrir Monitor". §3.1:
+//  battery is a metric too (Âmbar; Coral when low; "—" with a full ring on a
+//  Mac without one). §4: Lock Screen (circular, rectangular, inline).
+//  Values are the app's last sample; GPU stays simulated on iOS.
 //
 
 import AppIntents
@@ -12,7 +15,7 @@ import WidgetKit
 
 struct SmartiumMonitorConfiguration: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Monitor"
-    static let description = IntentDescription("Escolha a métrica do widget pequeno.")
+    static let description = IntentDescription("Escolha a métrica do widget.")
 
     @Parameter(title: "Métrica", default: .pinned)
     var metric: SmartiumMonitorMetricChoice
@@ -20,11 +23,11 @@ struct SmartiumMonitorConfiguration: WidgetConfigurationIntent {
     init() {}
 }
 
-/// Small widget's metric choice. `pinned` follows the metric pinned in the
-/// app (v0.6); the others keep `StWidgetMetric`'s raw values, so widgets
-/// configured before this option existed keep their metric.
+/// The metric choice. `pinned` follows the metric pinned in the app (v0.6);
+/// the others keep `StWidgetMetric`'s raw values, so widgets configured
+/// before an option existed keep their metric. `battery` is new in v0.12.
 enum SmartiumMonitorMetricChoice: String, AppEnum {
-    case pinned, cpu, gpu, memory, disk
+    case pinned, cpu, gpu, memory, disk, battery
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Métrica"
     static let caseDisplayRepresentations: [SmartiumMonitorMetricChoice: DisplayRepresentation] = [
@@ -33,6 +36,7 @@ enum SmartiumMonitorMetricChoice: String, AppEnum {
         .gpu: "GPU",
         .memory: "RAM",
         .disk: "Disco",
+        .battery: "Bateria",
     ]
 
     var metric: StWidgetMetric {
@@ -80,69 +84,192 @@ struct SmartiumMonitorWidget: Widget {
                 .widgetURL(StTool.monitor.deepLink)
         }
         .configurationDisplayName("Monitor")
-        .description("CPU, GPU, RAM e disco.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .description("CPU, GPU, RAM, disco ou bateria.")
+        .supportedFamilies(Self.families)
+    }
+
+    static var families: [WidgetFamily] {
+        #if os(iOS)
+        [.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline]
+        #else
+        [.systemSmall, .systemMedium]
+        #endif
+    }
+}
+
+/// The metric as the widgets show it.
+struct SmartiumMetricReading {
+    let metric: StWidgetMetric
+    let metrics: StMetricsSnapshot
+
+    /// 0–1, or nil for the battery of a Mac without one.
+    var value: Double? {
+        metrics.value(metric).map { min(max($0, 0), 1) }
+    }
+
+    var percent: Int? {
+        value.map { Int(($0 * 100).rounded()) }
+    }
+
+    /// "37%", or "—".
+    var percentText: String {
+        percent.map { "\($0)%" } ?? "—"
+    }
+
+    /// Ring fill: full without a value.
+    var fraction: Double { value ?? 1 }
+
+    /// Identity color; the battery turns Coral when low (§3.1).
+    var color: Color {
+        metric == .battery && metrics.isBatteryLow ? StTool.voice.tone : metric.rgb.color
+    }
+
+    /// "8 núcleos · ao vivo a cada 2 s".
+    var caption: String {
+        var parts: [String] = []
+        switch metric {
+        case .cpu:
+            if let cores = metrics.cores { parts.append("\(cores) núcleos") }
+        case .battery:
+            if metrics.battery == nil {
+                parts.append("Na tomada")
+            } else {
+                parts.append(metrics.batteryCharging == true ? "Carregando" : "Na bateria")
+            }
+        case .gpu:
+            parts.append("Estimado")
+        case .memory, .disk:
+            break
+        }
+        if let interval = metrics.interval {
+            parts.append("ao vivo a cada \(Self.seconds(interval))")
+        } else {
+            parts.append("atualizado às \(metrics.updatedAt.formatted(date: .omitted, time: .shortened))")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private static func seconds(_ value: Double) -> String {
+        let text = value.rounded() == value
+            ? String(Int(value))
+            : String(format: "%.1f", value).replacingOccurrences(of: ".", with: ",")
+        return text + " s"
     }
 }
 
 struct SmartiumMonitorWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
     let entry: SmartiumMonitorEntry
 
+    private let tool = StTool.monitor
+    private var reading: SmartiumMetricReading {
+        SmartiumMetricReading(metric: entry.metric, metrics: entry.metrics)
+    }
+
     var body: some View {
-        if family == .systemMedium {
-            HStack(spacing: 0) {
-                ForEach(StWidgetMetric.allCases, id: \.self) { metric in
-                    ring(metric, diameter: 72, lineWidth: 7, fontSize: 17)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .containerBackground(for: .widget) {
-                SmartiumWidgetBackground(
-                    stops: [
-                        .init(color: StAccent.sky.color(opacity: 0.24), location: 0),
-                        .init(color: StTool.orb.opacity(0.08), location: 0.6),
-                        .init(color: .stInk800, location: 0.9),
-                    ],
-                    center: UnitPoint(x: 0.15, y: 0.1),
-                    stroke: .white.opacity(0.06)
-                )
-            }
-        } else {
-            let rgb = entry.metric.rgb
-            ring(entry.metric, diameter: 128, lineWidth: 11, fontSize: 30)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .containerBackground(for: .widget) {
-                    SmartiumWidgetBackground(
-                        stops: [
-                            .init(color: rgb.color(opacity: 0.28), location: 0),
-                            .init(color: rgb.color(opacity: 0), location: 0.7),
-                        ],
-                        center: UnitPoint(x: 0.3, y: 0.15),
-                        stroke: rgb.color(opacity: 0.28)
-                    )
-                }
+        switch family {
+        #if os(iOS)
+        case .accessoryCircular, .accessoryRectangular, .accessoryInline:
+            SmartiumMonitorAccessoryView(reading: reading)
+        #endif
+        case .systemMedium:
+            medium.stWidgetBackground(tool.tone)
+        default:
+            small.stWidgetBackground(tool.tone)
         }
     }
 
-    /// Ring centered on the stroke radius of the prototype (r 56 in 128, r 31 in 72).
-    private func ring(_ metric: StWidgetMetric, diameter: CGFloat, lineWidth: CGFloat, fontSize: CGFloat) -> some View {
-        let value = min(max(entry.metrics.value(metric), 0), 1)
-        let percent = Int((value * 100).rounded())
-        let ringDiameter = diameter - (diameter == 128 ? 16 : 10)
-        return ZStack {
-            Circle()
-                .stroke(.white.opacity(0.08), lineWidth: lineWidth)
-            Circle()
-                .trim(from: 0, to: value)
-                .stroke(metric.rgb.color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            StBigNumber("\(percent)%", size: fontSize, unitColor: .white)
-                .padding(.horizontal, lineWidth + 2)
+    private var medium: some View {
+        StWidgetMediumLayout(
+            tone: tool.tone,
+            systemImage: tool.systemImage,
+            brand: "Monitor",
+            title: Text("\(reading.metric.label) \(reading.percentText)"),
+            caption: Text(reading.caption)
+        ) {
+            ring(lineWidth: 7, size: 20)
+        } actions: {
+            Link(destination: StTool.monitor.deepLink) {
+                StWidgetCapsule(title: "Abrir Monitor", systemImage: "arrow.up.forward", tone: tool.tone)
+            }
         }
-        .frame(width: ringDiameter, height: ringDiameter)
-        .frame(width: diameter, height: diameter)
+    }
+
+    private var small: some View {
+        StWidgetSmallLayout(label: Text(reading.metric.label)) {
+            Link(destination: StTool.monitor.deepLink) {
+                StWidgetRoundButton(systemImage: "arrow.up.forward", tone: tool.tone)
+            }
+            .accessibilityLabel("Abrir Monitor")
+        } element: {
+            ring(lineWidth: 6, size: 17)
+        }
+    }
+
+    private func ring(lineWidth: CGFloat, size: CGFloat) -> some View {
+        let primary = StWidgetTheme(colorScheme).primary
+        let isLowBattery = reading.metric == .battery && entry.metrics.isBatteryLow
+        return StWidgetRing(fraction: reading.fraction, color: reading.color, lineWidth: lineWidth) {
+            StBigNumber(
+                reading.percentText,
+                size: size,
+                color: isLowBattery ? reading.color : primary,
+                unitColor: primary
+            )
+        }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("\(Text(metric.localizedStringResource)) \(percent)%"))
+        .accessibilityLabel("\(reading.metric.label) \(reading.percentText)")
     }
 }
+
+// MARK: - Lock Screen (§4)
+
+#if os(iOS)
+/// Monochrome: the pinned (or chosen) metric's ring, value and bar.
+private struct SmartiumMonitorAccessoryView: View {
+    let reading: SmartiumMetricReading
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        content.containerBackground(for: .widget) { Color.clear }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch family {
+        case .accessoryCircular:
+            Gauge(value: reading.fraction) {
+                Image(systemName: reading.metric.systemImage)
+            } currentValueLabel: {
+                VStack(spacing: 0) {
+                    Image(systemName: reading.metric.systemImage)
+                        .font(.system(size: 10, weight: .semibold))
+                        .opacity(0.7)
+                    Text(reading.percentText)
+                        .minimumScaleFactor(0.5)
+                }
+            }
+            .gaugeStyle(.accessoryCircularCapacity)
+            .widgetAccentable()
+        case .accessoryRectangular:
+            VStack(alignment: .leading, spacing: 2) {
+                Label(reading.metric.label.uppercased(), systemImage: reading.metric.systemImage)
+                    .font(.system(size: 12, weight: .bold))
+                    .opacity(0.7)
+                    .widgetAccentable()
+                Text(reading.percentText)
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                ProgressView(value: reading.fraction)
+                    .progressViewStyle(.linear)
+                    .widgetAccentable()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        default:
+            Label("\(reading.metric.label) \(reading.percentText)", systemImage: reading.metric.systemImage)
+        }
+    }
+}
+#endif

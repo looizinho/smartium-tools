@@ -92,7 +92,10 @@ final class StMonitorModel {
       memory: memory.value.fraction,
       disk: disk.value.fraction,
       updatedAt: .now,
-      battery: battery?.value.level
+      battery: battery?.value.level,
+      batteryCharging: battery?.value.isCharging,
+      cores: coreNames.isEmpty ? nil : coreNames.count,
+      interval: StSettingsStore.shared.settings.monitor.interval
     )
     StLiveSurfaces.metrics = snapshot
 #if os(iOS)

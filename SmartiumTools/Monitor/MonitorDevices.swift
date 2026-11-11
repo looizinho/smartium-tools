@@ -23,7 +23,15 @@ struct StDevicesSection: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
+#if os(iOS) && canImport(ActivityKit)
+      HStack(alignment: .center) {
+        StSectionLabel(title: "Dispositivos", dot: StTool.orb.tone)
+        Spacer(minLength: 8)
+        StBatteryActivityButton()
+      }
+#else
       StSectionLabel(title: "Dispositivos", dot: StTool.orb.tone)
+#endif
       card
     }
   }
@@ -53,6 +61,31 @@ struct StDevicesSection: View {
       .frame(height: 1)
   }
 }
+
+#if os(iOS) && canImport(ActivityKit)
+/// Turns the batteries' Live Activity on and off (v0.12 §3.3), on iPhone.
+private struct StBatteryActivityButton: View {
+  private var manager = StBatteryActivityManager.shared
+
+  var body: some View {
+    let tone = StTool.orb
+    let isOn = manager.isRunning
+    Button {
+      Task { await manager.toggle() }
+    } label: {
+      Label(isOn ? "Encerrar" : "Ao vivo", systemImage: isOn ? "stop.fill" : "dot.radiowaves.left.and.right")
+        .font(StFont.body(12, .bold))
+        .foregroundStyle(isOn ? Color.stTextPrimary : tone.tone)
+        .padding(.horizontal, 12)
+        .frame(height: 28)
+        .background(Capsule().fill(isOn ? tone.opacity(0.85) : tone.opacity(0.14)))
+        .overlay(Capsule().strokeBorder(tone.opacity(isOn ? 0 : 0.32), lineWidth: 1))
+    }
+    .buttonStyle(StPressStyle())
+    .accessibilityLabel(isOn ? "Encerrar baterias ao vivo" : "Mostrar baterias na Ilha Dinâmica")
+  }
+}
+#endif
 
 /// 64 pt: ring with the device icon, name (and `ESTE`), state and percent.
 private struct StDeviceRow: View {
@@ -220,6 +253,14 @@ struct StMonitorHeroPager<Metric: View>: View {
     .accessibilityElement(children: .combine)
     .accessibilityAction(named: "Mostrar baterias") { show(batteries: true) }
     .accessibilityAction(named: "Mostrar métrica") { show(batteries: false) }
+    // v0.12 §1.5: only on the batteries view; its own accessibility element.
+    .overlay(alignment: .topTrailing) {
+      if state.showsBatteries {
+        StBatteryRefreshButton()
+          .padding(mode == .mac ? 20 : 8)
+          .transition(.opacity)
+      }
+    }
   }
 
   private var batteries: some View {
@@ -251,6 +292,59 @@ struct StMonitorHeroPager<Metric: View>: View {
   private func show(batteries: Bool) {
     guard batteries != state.showsBatteries else { return }
     withAnimation(.easeInOut(duration: 0.3)) { state.showsBatteries = batteries }
+  }
+}
+
+/// Refresh on the batteries view (v0.12 §1.5): a 34 pt Sky circle. A tap
+/// spins the icon (0.7 s a turn, at least 1 s; no spin with Reduce Motion),
+/// reads this device's battery and publishes it, and reads the others again.
+/// At 50% and disabled until the reading is back.
+private struct StBatteryRefreshButton: View {
+  @State private var isRefreshing = false
+  @State private var angle: Double = 0
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  private static let turn: Duration = .milliseconds(700)
+
+  var body: some View {
+    let sky = StAccent.sky
+    Button(action: refresh) {
+      Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
+        .font(.system(size: 19, weight: .semibold))
+        .foregroundStyle(sky.color)
+        .rotationEffect(.degrees(angle))
+        .frame(width: 34, height: 34)
+        .background(Circle().fill(sky.color(opacity: 0.14)))
+        .overlay(Circle().strokeBorder(sky.color(opacity: 0.32), lineWidth: 1))
+        .contentShape(Circle())
+    }
+    .buttonStyle(StPressStyle())
+    .focusEffectDisabled()
+    .disabled(isRefreshing)
+    .opacity(isRefreshing ? 0.5 : 1)
+    .accessibilityLabel("Atualizar baterias")
+  }
+
+  private func refresh() {
+    guard !isRefreshing else { return }
+    isRefreshing = true
+    let reduceMotion = reduceMotion
+    Task {
+      let started = ContinuousClock.now
+      if !reduceMotion { spin() }
+      StDeviceSync.shared.refreshNow()
+      // At least 1 s, so the tap never looks ignored; a turn ends whole.
+      while ContinuousClock.now - started < .seconds(1) {
+        try? await Task.sleep(for: Self.turn)
+        if !reduceMotion, ContinuousClock.now - started < .seconds(1) { spin() }
+      }
+      isRefreshing = false
+      AccessibilityNotification.Announcement("Baterias atualizadas").post()
+    }
+  }
+
+  private func spin() {
+    withAnimation(.linear(duration: 0.7)) { angle += 360 }
   }
 }
 

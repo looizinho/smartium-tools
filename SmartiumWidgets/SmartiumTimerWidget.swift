@@ -2,8 +2,11 @@
 //  SmartiumTimerWidget.swift
 //  SmartiumWidgets
 //
-//  Timer widgets (handoff v0.5). Small: the remaining time. Medium: the time
-//  plus Pausar/Retomar and Reiniciar, with the same intents as the control.
+//  Timer widgets. v0.12 §2: the Orb's layout and system theme. Medium: the
+//  ring with the clock on the plate, "04:12 restantes", the end message and
+//  time, Pausar / Iniciar and the round Reiniciar. Small: the ring with the
+//  clock and a play / pause button. §4: Lock Screen (circular, rectangular,
+//  inline), monochrome, counting on their own with `timerInterval`.
 //
 
 import AppIntents
@@ -25,11 +28,20 @@ struct SmartiumTimerProvider: TimelineProvider {
         completion(SmartiumTimerEntry(date: .now, snapshot: StLiveSurfaces.timer))
     }
 
-    /// The app reloads on every change; the only scheduled entry is the end of the countdown.
+    /// The app reloads on every change. While counting, entries move the
+    /// ring (about 60 steps, at least 15 s apart; the clock counts by itself)
+    /// up to the end.
     func getTimeline(in context: Context, completion: @escaping (Timeline<SmartiumTimerEntry>) -> Void) {
         let snapshot = StLiveSurfaces.timer
-        var entries = [SmartiumTimerEntry(date: .now, snapshot: snapshot)]
-        if snapshot.phase(at: .now) == .running, let fireDate = snapshot.fireDate {
+        let now = Date.now
+        var entries = [SmartiumTimerEntry(date: now, snapshot: snapshot)]
+        if snapshot.phase(at: now) == .running, let fireDate = snapshot.fireDate {
+            let step = max(15, fireDate.timeIntervalSince(now) / 60)
+            var date = now.addingTimeInterval(step)
+            while date < fireDate {
+                entries.append(SmartiumTimerEntry(date: date, snapshot: snapshot))
+                date = date.addingTimeInterval(step)
+            }
             entries.append(SmartiumTimerEntry(date: fireDate, snapshot: snapshot))
         }
         completion(Timeline(entries: entries, policy: .never))
@@ -44,7 +56,10 @@ struct SmartiumTimerWidget: Widget {
         }
         .configurationDisplayName("Timer")
         .description("Tempo restante do timer, com pausar e reiniciar.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([
+            .systemSmall, .systemMedium,
+            .accessoryCircular, .accessoryRectangular, .accessoryInline,
+        ])
     }
 }
 
@@ -52,98 +67,321 @@ struct SmartiumTimerWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: SmartiumTimerEntry
 
-    private var phase: StTimerSnapshot.Phase { entry.snapshot.phase(at: entry.date) }
+    private let tool = StTool.timer
+    private var snapshot: StTimerSnapshot { entry.snapshot }
+    private var phase: StTimerSnapshot.Phase { snapshot.phase(at: entry.date) }
 
     var body: some View {
-        Group {
-            if family == .systemMedium {
-                HStack(spacing: 10) {
-                    clock(size: hasHours ? 40 : 52)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    toggleButton
-                    resetButton
-                }
-            } else {
-                clock(size: hasHours ? 30 : 44)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .containerBackground(for: .widget) {
-            SmartiumWidgetBackground(
-                stops: [
-                    .init(color: StTool.timer.opacity(0.3), location: 0),
-                    .init(color: StAccent.sky.color(opacity: 0.08), location: 0.6),
-                    .init(color: .stInk800, location: 0.9),
-                ],
-                center: family == .systemMedium ? UnitPoint(x: 0.2, y: 0.1) : UnitPoint(x: 0.3, y: 0.15),
-                stroke: StTool.timer.opacity(0.25)
-            )
+        switch family {
+        case .accessoryCircular, .accessoryRectangular, .accessoryInline:
+            SmartiumTimerAccessoryView(snapshot: snapshot, date: entry.date)
+        case .systemMedium:
+            medium.stWidgetBackground(tool.tone)
+        default:
+            small.stWidgetBackground(tool.tone)
         }
     }
 
-    /// Seconds the clock shows; when idle, the duration a start would use.
+    // MARK: Layouts
+
+    private var medium: some View {
+        StWidgetMediumLayout(
+            tone: tool.tone,
+            systemImage: tool.systemImage,
+            brand: "Timer",
+            title: title,
+            caption: Text(caption)
+        ) {
+            ring(lineWidth: 7, clockSize: hasHours ? 15 : 20)
+        } actions: {
+            Button(intent: ToggleTimerIntent(running: phase != .running)) {
+                StWidgetCapsule(title: toggleTitle, systemImage: toggleSymbol, tone: tool.tone)
+            }
+            .buttonStyle(.plain)
+
+            Button(intent: ResetTimerIntent()) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(StFont.body(11, .bold))
+                    .foregroundStyle(StTool.voice.tone)
+                    .frame(width: 28, height: 28)
+                    .background(Circle().fill(StTool.voice.opacity(0.16)))
+                    .overlay(Circle().strokeBorder(StTool.voice.opacity(0.35), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Reiniciar")
+        }
+    }
+
+    private var small: some View {
+        StWidgetSmallLayout(label: Text(smallLabel)) {
+            Button(intent: ToggleTimerIntent(running: phase != .running)) {
+                StWidgetRoundButton(systemImage: toggleSymbol, tone: tool.tone)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(toggleTitle)
+        } element: {
+            ring(lineWidth: 6, clockSize: hasHours ? 13 : 17)
+        }
+    }
+
+    // MARK: Ring
+
+    /// Seconds shown; when idle, the duration a start would use.
     private var shownSeconds: TimeInterval {
-        phase == .idle ? entry.snapshot.lastDuration : entry.snapshot.remaining(at: entry.date)
+        phase == .idle ? snapshot.lastDuration : snapshot.remaining(at: entry.date)
     }
 
     private var hasHours: Bool { shownSeconds >= 3_600 }
 
-    private func clock(size: CGFloat) -> some View {
+    private var total: TimeInterval {
+        max(snapshot.total ?? snapshot.lastDuration, 1)
+    }
+
+    private var fraction: Double {
+        switch phase {
+        case .idle: 1
+        case .alerting: 0
+        case .running, .paused: snapshot.remaining(at: entry.date) / total
+        }
+    }
+
+    private func ring(lineWidth: CGFloat, clockSize: CGFloat) -> some View {
+        StWidgetRing(fraction: fraction, color: tool.tone, lineWidth: lineWidth) {
+            SmartiumTimerClock(snapshot: snapshot, date: entry.date, size: clockSize)
+        }
+    }
+
+    // MARK: Texts
+
+    private var title: Text {
+        switch phase {
+        case .running:
+            if let fireDate = snapshot.fireDate {
+                return Text("\(Text(timerInterval: entry.date...fireDate, countsDown: true)) restantes")
+            }
+            return Text("\(StTimerSnapshot.format(shownSeconds)) restantes")
+        case .paused:
+            return Text("\(StTimerSnapshot.format(shownSeconds)) restantes")
+        case .idle:
+            return Text("\(StTimerSnapshot.format(shownSeconds)) definido")
+        case .alerting:
+            return Text("Encerrado!")
+        }
+    }
+
+    /// The end message and, while counting, the end time.
+    private var caption: String {
+        let message = snapshot.message.isEmpty ? LimitimerSettings.defaultEndMessage : snapshot.message
+        switch phase {
+        case .running:
+            let end = (snapshot.fireDate ?? entry.date).formatted(date: .omitted, time: .shortened)
+            return "\(message) · termina às \(end)"
+        case .paused:
+            return "\(message) · pausado"
+        case .idle, .alerting:
+            return message
+        }
+    }
+
+    private var smallLabel: String {
+        switch phase {
+        case .running: "Restante"
+        case .paused: "Pausado"
+        case .idle: "Definido"
+        case .alerting: "Encerrado!"
+        }
+    }
+
+    private var toggleTitle: LocalizedStringKey {
+        switch phase {
+        case .running: "Pausar"
+        case .paused: "Retomar"
+        case .alerting: "Parar"
+        case .idle: "Iniciar"
+        }
+    }
+
+    private var toggleSymbol: String {
+        switch phase {
+        case .running: "pause.fill"
+        case .alerting: "stop.fill"
+        case .paused, .idle: "play.fill"
+        }
+    }
+}
+
+/// The clock inside the ring: counts by itself while running.
+private struct SmartiumTimerClock: View {
+    let snapshot: StTimerSnapshot
+    let date: Date
+    let size: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let phase = snapshot.phase(at: date)
         Group {
-            if phase == .running, let fireDate = entry.snapshot.fireDate {
-                Text(timerInterval: entry.date...fireDate, countsDown: true)
+            if phase == .running, let fireDate = snapshot.fireDate {
+                Text(timerInterval: date...fireDate, countsDown: true)
             } else {
-                Text(StTimerSnapshot.format(shownSeconds))
+                Text(StTimerSnapshot.format(phase == .idle ? snapshot.lastDuration : snapshot.remaining(at: date)))
             }
         }
         .font(StFont.bigNumber(size))
-        .foregroundStyle(.white.opacity(phase == .idle ? 0.55 : 1))
+        .foregroundStyle(StWidgetTheme(colorScheme).primary.opacity(phase == .idle ? 0.55 : 1))
         .monospacedDigit()
+        .multilineTextAlignment(.center)
         .lineLimit(1)
-        .minimumScaleFactor(0.6)
+        .minimumScaleFactor(0.5)
+    }
+}
+
+// MARK: - Lock Screen (§4)
+
+/// Monochrome: the system applies the glass and the color, so only
+/// `AccessoryWidgetBackground` and the default style, with opacity for
+/// hierarchy. While counting, the ring and the clock run on their own.
+private struct SmartiumTimerAccessoryView: View {
+    let snapshot: StTimerSnapshot
+    let date: Date
+    @Environment(\.widgetFamily) private var family
+
+    private var phase: StTimerSnapshot.Phase { snapshot.phase(at: date) }
+
+    private var total: TimeInterval {
+        max(snapshot.total ?? snapshot.lastDuration, 1)
     }
 
-    private var toggleButton: some View {
-        let isRunning = phase == .running
-        return Button(intent: ToggleTimerIntent(running: !isRunning)) {
-            Image(systemName: isRunning ? "pause.fill" : "play.fill")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Color.stInk900)
-                .frame(width: 56, height: 56)
-                .background(Circle().fill(StTool.timer.tone))
-                .shadow(color: StTool.timer.opacity(0.35), radius: 9, y: 6)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(isRunning ? "Pausar" : "Retomar")
+    /// Start of an interval that ends at `fireDate` and lasts `total`, so
+    /// the system's progress starts at the remaining fraction.
+    private var interval: ClosedRange<Date>? {
+        guard phase == .running, let fireDate = snapshot.fireDate else { return nil }
+        let start = min(fireDate.addingTimeInterval(-total), date)
+        return start...fireDate
     }
 
-    private var resetButton: some View {
-        Button(intent: ResetTimerIntent()) {
-            Image(systemName: "arrow.counterclockwise")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(StTool.voice.tone)
-                .frame(width: 56, height: 56)
-                .background(Circle().fill(StTool.voice.opacity(0.16)))
-                .overlay(Circle().strokeBorder(StTool.voice.opacity(0.35), lineWidth: 1))
+    private var remaining: TimeInterval {
+        phase == .idle ? snapshot.lastDuration : snapshot.remaining(at: date)
+    }
+
+    private var staticFraction: Double {
+        switch phase {
+        case .idle: 1
+        case .alerting: 0
+        case .running, .paused: remaining / total
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Reiniciar")
+    }
+
+    var body: some View {
+        content.containerBackground(for: .widget) { Color.clear }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch family {
+        case .accessoryCircular: circular
+        case .accessoryRectangular: rectangular
+        default: inline
+        }
+    }
+
+    /// Ring with the icon and `4:12`.
+    private var circular: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            Group {
+                if let interval {
+                    ProgressView(timerInterval: interval, countsDown: true) {
+                        EmptyView()
+                    } currentValueLabel: {
+                        EmptyView()
+                    }
+                } else {
+                    ProgressView(value: staticFraction)
+                }
+            }
+            .progressViewStyle(.circular)
+            .padding(3)
+            VStack(spacing: 0) {
+                Image(systemName: StTool.timer.systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+                    .opacity(0.7)
+                clock
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .minimumScaleFactor(0.5)
+            }
+            .padding(.horizontal, 7)
+        }
+        .widgetAccentable()
+        .accessibilityElement(children: .combine)
+    }
+
+    /// `TIMER`, "04:12 restantes" and a progress bar.
+    private var rectangular: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Label("TIMER", systemImage: StTool.timer.systemImage)
+                .font(.system(size: 12, weight: .bold))
+                .opacity(0.7)
+                .widgetAccentable()
+            Group {
+                switch phase {
+                case .alerting: Text("Encerrado!")
+                case .idle: Text("\(clock) definido")
+                case .running, .paused: Text("\(clock) restantes")
+                }
+            }
+            .font(.system(size: 17, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            Group {
+                if let interval {
+                    ProgressView(timerInterval: interval, countsDown: true) {
+                        EmptyView()
+                    } currentValueLabel: {
+                        EmptyView()
+                    }
+                } else {
+                    ProgressView(value: staticFraction)
+                }
+            }
+            .progressViewStyle(.linear)
+            .widgetAccentable()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Icon and "Timer · 04:12".
+    private var inline: some View {
+        ViewThatFits {
+            Label {
+                Text("Timer · \(clock)")
+            } icon: {
+                Image(systemName: StTool.timer.systemImage)
+            }
+            Label {
+                clock
+            } icon: {
+                Image(systemName: StTool.timer.systemImage)
+            }
+        }
+    }
+
+    private var clock: Text {
+        if let interval {
+            return Text(timerInterval: date...interval.upperBound, countsDown: true)
+        }
+        return Text(Self.short(remaining))
+    }
+
+    /// `4:12`, or `1:00:00`: the Lock Screen drops the leading zero.
+    private static func short(_ seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds.rounded(.up)))
+        let hours = total / 3_600
+        let minutes = (total % 3_600) / 60
+        let rest = total % 60
+        return hours > 0
+            ? String(format: "%d:%02d:%02d", hours, minutes, rest)
+            : String(format: "%d:%02d", minutes, rest)
     }
 }
 #endif
-
-/// Radial glow over Ink 800 with a 1pt tinted inner stroke (v0.5 widgets).
-struct SmartiumWidgetBackground: View {
-    let stops: [Gradient.Stop]
-    let center: UnitPoint
-    let stroke: Color
-
-    var body: some View {
-        ZStack {
-            Color.stInk800
-            EllipticalGradient(stops: stops, center: center, startRadiusFraction: 0, endRadiusFraction: 0.9)
-            ContainerRelativeShape()
-                .strokeBorder(stroke, lineWidth: 1)
-        }
-    }
-}
