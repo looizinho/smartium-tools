@@ -37,6 +37,9 @@ struct SmartiumToolsApp: App {
                 }
                 .task(id: scenePhase) {
                     guard scenePhase == .active else { return }
+                    // Device batteries (v0.11): sync the key-value store,
+                    // read every device and publish this one.
+                    StDeviceSync.shared.activate()
                     await ICloudSettings.prepareTestFile()
                     _ = await ICloudSettings.loadLimitimer()
                     await StSettingsStore.shared.syncWithICloud()

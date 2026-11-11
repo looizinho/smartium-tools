@@ -168,9 +168,12 @@ final class LiveMetricsProvider: StMetricsProvider {
             let maximum = description[kIOPSMaxCapacityKey] as? Int,
             maximum > 0
       else { continue }
+      // Charging, or full on the charger (v0.11), like iOS's `.full`.
+      let onCharger = description[kIOPSPowerSourceStateKey] as? String == kIOPSACPowerValue
+      let isCharged = description[kIOPSIsChargedKey] as? Bool ?? false
       return StBatteryReading(
         level: Double(current) / Double(maximum),
-        isCharging: description[kIOPSIsChargingKey] as? Bool ?? false
+        isCharging: (description[kIOPSIsChargingKey] as? Bool ?? false) || (onCharger && isCharged)
       )
     }
     return nil

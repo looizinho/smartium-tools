@@ -4,7 +4,8 @@
 //
 //  Monitor tool (handoff v0.3): one ring in the hero on iPhone (CPU, or the
 //  pinned metric), a 2×2 grid of rings on the Mac, then gauges, cores,
-//  network, thermal state and the sampling interval.
+//  network, thermal state and the sampling interval. v0.11: the Hero swipes
+//  to the device batteries, and a "Dispositivos" card follows the gauges.
 //  App-only: excluded from SmartiumWidgetsExtension.
 //
 
@@ -30,10 +31,12 @@ struct MonitorView: View {
 
   var body: some View {
     StAdaptiveToolLayout(tool: .monitor, tag: "Monitor") { size in
-      if mode == .mac {
-        quadHero
-      } else {
-        singleHero(size: size)
+      StMonitorHeroPager(size: size) {
+        if mode == .mac {
+          quadHero
+        } else {
+          singleHero(size: size)
+        }
       }
     } controls: {
       StToolHeader(
@@ -44,6 +47,8 @@ struct MonitorView: View {
       )
 
       gaugeGrid
+
+      StDevicesSection()
 
       StHeatmap(
         title: "Núcleos · \(StMonitorModel.historyLength) amostras",

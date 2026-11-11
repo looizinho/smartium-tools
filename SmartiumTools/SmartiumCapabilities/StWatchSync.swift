@@ -6,7 +6,9 @@
 //  `StWatchState` and sends it with `updateApplicationContext` (the system
 //  delivers the latest when the watch wakes). User actions also go out at
 //  once with `sendMessage` while the watch app is reachable, and so do
-//  Monitor samples. App-only and iOS-only.
+//  Monitor samples. Since v0.11 the watch sends its battery back, which goes
+//  to `StDeviceSync`, and the state carries every device's battery.
+//  App-only and iOS-only.
 //
 
 import Foundation
@@ -30,6 +32,7 @@ final class StWatchSync {
         state.timer = StLiveSurfaces.timer
         state.monitor.pinned = StSettingsStore.shared.settings.monitor.pinnedMetric
         state.monitor.snapshot = StLiveSurfaces.metrics
+        state.devices = StDeviceSync.shared.devices
         link.currentState = { [weak self] in
             self?.stamped()
         }
@@ -68,6 +71,13 @@ final class StWatchSync {
         let order = StWatchState.order(from: tabOrder)
         guard order != state.order else { return }
         state.order = order
+        send(focus: nil)
+    }
+
+    /// The device batteries changed (v0.11).
+    func devicesChanged(_ devices: [StDeviceBattery]) {
+        guard devices != state.devices else { return }
+        state.devices = devices
         send(focus: nil)
     }
 
@@ -141,6 +151,9 @@ nonisolated private final class StWatchLink: NSObject, WCSessionDelegate, @unche
     // MARK: WCSessionDelegate
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        if activationState == .activated {
+            receiveBattery(session.receivedApplicationContext)
+        }
         queue.async { [self] in
             guard activationState == .activated, let data = pending else { return }
             pending = nil
@@ -156,8 +169,23 @@ nonisolated private final class StWatchLink: NSObject, WCSessionDelegate, @unche
         session.activate()
     }
 
+    /// The watch's battery (v0.11), from its context or a message.
+    private func receiveBattery(_ payload: [String: Any]) {
+        guard let battery = StWatchTransport.decodeBattery(payload) else { return }
+        Task { @MainActor in StDeviceSync.shared.receiveWatch(battery) }
+    }
+
+    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
+        receiveBattery(applicationContext)
+    }
+
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        receiveBattery(message)
+    }
+
     /// The watch's "hello": answer with the current state.
     func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        receiveBattery(message)
         guard message[StWatchTransport.helloKey] != nil else {
             replyHandler([:])
             return
