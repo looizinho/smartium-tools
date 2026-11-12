@@ -48,7 +48,7 @@ nonisolated enum StTimer {
 
 /// Timer hero: Menta progress ring, Sky tick ring, label + clock + status.
 /// The clock is a white `StBigNumber` without glow (v0.3), at 20% of the hero
-/// for mm:ss and 14% for h:mm:ss so it stays inside the ring (v0.4).
+/// for m:ss and 14% for h:mm:ss so it stays inside the ring (v0.4).
 struct StTimerRing: View {
     let size: CGFloat
     /// Remaining fraction, 0–1.
@@ -85,23 +85,6 @@ struct StTimerRing: View {
             .accessibilityElement(children: .combine)
         }
     }
-}
-
-/// Clock text: `mm:ss`, or `h:mm:ss` from 1 h.
-nonisolated enum TimerFormat {
-    static func duration(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds.rounded()))
-        let hours = total / 3_600
-        let minutes = (total % 3_600) / 60
-        let remainingSeconds = total % 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
-        }
-
-        return String(format: "%02d:%02d", minutes, remainingSeconds)
-    }
-
 }
 
 /// Timer adjustments (v0.3 "ATALHOS"): add or remove time, no selected state.
@@ -142,7 +125,7 @@ private struct AlarmKitViewContent: View {
             size: size,
             fraction: remaining.map { total > 0 ? $0 / total : 0 } ?? 1,
             label: remaining == nil ? "DEFINIDO" : "RESTANTE",
-            clock: TimerFormat.duration(remaining ?? selectedDuration),
+            clock: StTimerSnapshot.format(remaining ?? selectedDuration),
             status: ringStatus
         )
     }
@@ -399,7 +382,7 @@ private struct AlarmKitViewContent: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 0) {
-                StBigNumber(TimerFormat.duration(recent.duration), size: 24)
+                StBigNumber(StTimerSnapshot.format(recent.duration), size: 24)
 
                 Text(recent.message.isEmpty ? "Sem mensagem" : recent.message)
                     .font(StFont.body(13))
@@ -421,7 +404,7 @@ private struct AlarmKitViewContent: View {
             }
             .buttonStyle(StPressStyle())
             .focusEffectDisabled()
-            .accessibilityLabel("Iniciar \(TimerFormat.duration(recent.duration))")
+            .accessibilityLabel("Iniciar \(StTimerSnapshot.format(recent.duration))")
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)

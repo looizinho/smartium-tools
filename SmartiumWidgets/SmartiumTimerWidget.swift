@@ -3,7 +3,7 @@
 //  SmartiumWidgets
 //
 //  Timer widgets. v0.12 §2: the Orb's layout and system theme. Medium: the
-//  ring with the clock on the plate, "04:12 restantes", the end message and
+//  ring with the clock on the plate, "4:12 restantes", the end message and
 //  time, Pausar / Iniciar and the round Zerar. Small: the ring with the
 //  clock and a play / pause button. §4: Lock Screen (circular, rectangular,
 //  inline), counting on their own with `timerInterval`; since v0.12.1 they

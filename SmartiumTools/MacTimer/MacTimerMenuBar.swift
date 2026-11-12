@@ -24,24 +24,13 @@ struct MacTimerMenuBar: Scene {
             HStack(spacing: 4) {
                 Image(systemName: "timer")
                     .foregroundStyle(service.phase == .running ? StTool.timer.tone : .white.opacity(0.55))
-                Text(MacTimerMenuBar.clock(service.remaining ?? 0))
+                Text(StTimerSnapshot.format(service.remaining ?? 0))
                     .font(StFont.body(13, .semibold))
                     .monospacedDigit()
             }
-            .accessibilityLabel("Timer \(MacTimerMenuBar.clock(service.remaining ?? 0))")
+            .accessibilityLabel("Timer \(StTimerSnapshot.format(service.remaining ?? 0))")
         }
         .menuBarExtraStyle(.window)
-    }
-
-    /// `m:ss`, or `h:mm:ss` from 1 h (§1).
-    nonisolated static func clock(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds.rounded(.up)))
-        let hours = total / 3_600
-        let minutes = (total % 3_600) / 60
-        let rest = total % 60
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, rest)
-            : String(format: "%d:%02d", minutes, rest)
     }
 }
 
@@ -57,7 +46,7 @@ private struct MacTimerPopover: View {
                     .font(.stTag)
                     .tracking(1.4)
                     .foregroundStyle(StAccent.sky.color)
-                StBigNumber(TimerFormat.duration(service.remaining ?? 0), size: 44)
+                StBigNumber(StTimerSnapshot.format(service.remaining ?? 0), size: 44)
             }
             .frame(maxWidth: .infinity)
             .accessibilityElement(children: .combine)

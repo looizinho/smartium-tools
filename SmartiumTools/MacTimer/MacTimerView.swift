@@ -25,7 +25,7 @@ struct MacTimerView: View {
                 size: size,
                 fraction: remaining.map { total > 0 ? $0 / total : 0 } ?? 1,
                 label: remaining == nil ? "DEFINIDO" : "RESTANTE",
-                clock: TimerFormat.duration(remaining ?? selectedDuration),
+                clock: StTimerSnapshot.format(remaining ?? selectedDuration),
                 status: ringStatus
             )
         } controls: {
@@ -293,7 +293,7 @@ struct MacTimerView: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 0) {
-                StBigNumber(TimerFormat.duration(recent.duration), size: 24)
+                StBigNumber(StTimerSnapshot.format(recent.duration), size: 24)
                 Text(recent.message.isEmpty ? "Sem mensagem" : recent.message)
                     .font(StFont.body(13))
                     .foregroundStyle(Color.stTextPrimary.opacity(0.55))
@@ -314,7 +314,7 @@ struct MacTimerView: View {
             }
             .buttonStyle(StPressStyle())
             .focusEffectDisabled()
-            .accessibilityLabel("Iniciar \(TimerFormat.duration(recent.duration))")
+            .accessibilityLabel("Iniciar \(StTimerSnapshot.format(recent.duration))")
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)

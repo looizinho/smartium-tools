@@ -10,7 +10,7 @@
 //    with the icon inside) and two lines on the right, the tool's name at
 //    13 pt semibold and the value at 17 pt bold.
 //  - Circular: a capacity gauge with the icon above and a short value below.
-//  - Inline: icon and "Timer · 04:12".
+//  - Inline: icon and "Timer · 4:12".
 //
 //  One color rule, by `widgetRenderingMode` (§1.1): `.fullColor` uses the
 //  tool's color on the ring, icon and name, with the value in the primary
@@ -57,7 +57,7 @@ struct StComplication: View {
     let tone: Color
     let icon: StComplicationIcon
     let progress: StComplicationProgress
-    /// Rectangular value ("04:12", "CPU 37%", "82 · 64 · 41").
+    /// Rectangular value ("4:12", "CPU 37%", "82 · 64 · 41").
     let value: Text
     /// Circular and inline value, when shorter than `value`.
     var shortValue: Text? = nil
@@ -263,7 +263,7 @@ struct StTimerComplication: View {
         if let interval {
             return Text(timerInterval: date...interval.upperBound, countsDown: true)
         }
-        return Text(Self.short(remaining))
+        return Text(StTimerSnapshot.format(remaining))
     }
 
     private var value: Text {
@@ -284,17 +284,6 @@ struct StTimerComplication: View {
             value: value,
             shortValue: phase == .alerting ? Text("Fim") : clock
         )
-    }
-
-    /// `4:12`, or `1:00:00`: no leading zero.
-    static func short(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds.rounded(.up)))
-        let hours = total / 3_600
-        let minutes = (total % 3_600) / 60
-        let rest = total % 60
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, rest)
-            : String(format: "%d:%02d", minutes, rest)
     }
 }
 

@@ -108,9 +108,9 @@ private struct SmartiumTimerCountdownText: View {
             case .countdown(let countdown):
                 Text(timerInterval: Date.now...max(countdown.fireDate, .now), countsDown: true)
             case .paused(let paused):
-                Text(SmartiumTimerStatus.format(paused.totalCountdownDuration - paused.previouslyElapsedDuration))
+                Text(StTimerSnapshot.format(paused.totalCountdownDuration - paused.previouslyElapsedDuration))
             default:
-                Text("00:00")
+                Text(StTimerSnapshot.format(0))
             }
         }
         .monospacedDigit()
@@ -177,16 +177,6 @@ private nonisolated enum SmartiumTimerStatus {
         case .paused: "Pausado"
         default: "Encerrado!"
         }
-    }
-
-    static func format(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds.rounded()))
-        let hours = total / 3_600
-        let minutes = (total % 3_600) / 60
-        let remaining = total % 60
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, remaining)
-            : String(format: "%02d:%02d", minutes, remaining)
     }
 }
 
