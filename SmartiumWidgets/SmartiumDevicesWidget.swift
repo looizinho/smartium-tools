@@ -7,30 +7,142 @@
 //  system theme (§2). The app copies the list from `StDeviceSync` to the App
 //  Group, since the extension can't read the key-value store. §4: Lock Screen
 //  (circular, rectangular, inline). Opens the Monitor.
+//  v0.12.3: the user picks the devices (`SmartiumDevicesConfiguration`),
+//  and a single device gets its own layout: one large ring with the icon and
+//  the percent.
 //
 
+import AppIntents
 import SwiftUI
 import WidgetKit
 
-struct SmartiumDevicesEntry: TimelineEntry {
-    let date: Date
-    let devices: [StDeviceBattery]
+// MARK: - Configuration (v0.12.3 §1)
+
+struct SmartiumDevicesConfiguration: WidgetConfigurationIntent {
+    static let title: LocalizedStringResource = "Dispositivos"
+    static let description = IntentDescription("Escolha os aparelhos do widget.")
+
+    /// On by default, so widgets placed before v0.12.3 keep showing every device.
+    @Parameter(title: "Seleção automática", default: true)
+    var isAutomatic: Bool
+
+    @Parameter(title: "Aparelhos")
+    var devices: [StDeviceEntity]?
+
+    static var parameterSummary: some ParameterSummary {
+        When(\.$isAutomatic, .equalTo, false) {
+            Summary {
+                \.$isAutomatic
+                \.$devices
+            }
+        } otherwise: {
+            Summary {
+                \.$isAutomatic
+            }
+        }
+    }
+
+    init() {}
 }
 
-struct SmartiumDevicesProvider: TimelineProvider {
+/// A device from the App Group list (`StLiveSurfaces.devices`). The id is the
+/// installation's UUID, so the choice survives a rename (§1.1).
+struct StDeviceEntity: AppEntity {
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Aparelho"
+    static let defaultQuery = StDeviceEntityQuery()
+
+    let id: String
+    let name: String
+    let kind: StDeviceBattery.Kind?
+
+    init(_ device: StDeviceBattery) {
+        id = device.id
+        name = device.name
+        kind = device.kind
+    }
+
+    /// A chosen device that left the list: the choice stays stored, and the
+    /// widget simply doesn't draw it.
+    init(missingID id: String) {
+        self.id = id
+        name = "Aparelho indisponível"
+        kind = nil
+    }
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(name)", subtitle: "\(kind?.typeName ?? "Não aparece mais")")
+    }
+}
+
+struct StDeviceEntityQuery: EntityQuery {
+    init() {}
+
+    func entities(for identifiers: [String]) async throws -> [StDeviceEntity] {
+        let known = StLiveSurfaces.devices
+        return identifiers.map { id in
+            known.first { $0.id == id }.map(StDeviceEntity.init) ?? StDeviceEntity(missingID: id)
+        }
+    }
+
+    /// Every known device, so the editor's list shows up ready.
+    func suggestedEntities() async throws -> [StDeviceEntity] {
+        StLiveSurfaces.devices.map(StDeviceEntity.init)
+    }
+}
+
+extension StDeviceBattery.Kind {
+    /// The device type, under the name in the widget editor.
+    var typeName: String {
+        switch self {
+        case .iphone: "iPhone"
+        case .watch: "Apple Watch"
+        case .mac: "Mac"
+        }
+    }
+}
+
+struct SmartiumDevicesEntry: TimelineEntry {
+    let date: Date
+    /// What the widget draws, outer ring first. Automatic: every known
+    /// device, one ring per kind. Chosen: up to three, in the chosen order,
+    /// leaving out the ones that are gone.
+    let devices: [StDeviceBattery]
+    /// The user's own choice: rings by position, not by kind (§1).
+    let isChosen: Bool
+
+    init(date: Date, devices: [StDeviceBattery], isChosen: Bool = false) {
+        self.date = date
+        self.devices = isChosen ? Array(devices.prefix(3)) : StDeviceList.ringDevices(devices)
+        self.isChosen = isChosen
+    }
+}
+
+struct SmartiumDevicesProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> SmartiumDevicesEntry {
         SmartiumDevicesEntry(date: .now, devices: Self.sample)
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (SmartiumDevicesEntry) -> Void) {
-        let devices = StLiveSurfaces.devices
-        completion(SmartiumDevicesEntry(date: .now, devices: devices.isEmpty && context.isPreview ? Self.sample : devices))
+    func snapshot(for configuration: SmartiumDevicesConfiguration, in context: Context) async -> SmartiumDevicesEntry {
+        if StLiveSurfaces.devices.isEmpty && context.isPreview {
+            return SmartiumDevicesEntry(date: .now, devices: Self.sample)
+        }
+        return entry(for: configuration)
     }
 
     /// The app reloads on every change; the timeline re-reads every 15 minutes.
-    func getTimeline(in context: Context, completion: @escaping (Timeline<SmartiumDevicesEntry>) -> Void) {
-        let entry = SmartiumDevicesEntry(date: .now, devices: StLiveSurfaces.devices)
-        completion(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(15 * 60))))
+    func timeline(for configuration: SmartiumDevicesConfiguration, in context: Context) async -> Timeline<SmartiumDevicesEntry> {
+        Timeline(entries: [entry(for: configuration)], policy: .after(.now.addingTimeInterval(15 * 60)))
+    }
+
+    private func entry(for configuration: SmartiumDevicesConfiguration) -> SmartiumDevicesEntry {
+        let known = StLiveSurfaces.devices
+        guard !configuration.isAutomatic else {
+            return SmartiumDevicesEntry(date: .now, devices: known)
+        }
+        let chosen = (configuration.devices ?? []).compactMap { choice in
+            known.first { $0.id == choice.id }
+        }
+        return SmartiumDevicesEntry(date: .now, devices: chosen, isChosen: true)
     }
 
     /// Gallery preview: 82 · 64 · 41.
@@ -43,7 +155,11 @@ struct SmartiumDevicesProvider: TimelineProvider {
 
 struct SmartiumDevicesWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: StLiveSurfaces.devicesWidgetKind, provider: SmartiumDevicesProvider()) { entry in
+        AppIntentConfiguration(
+            kind: StLiveSurfaces.devicesWidgetKind,
+            intent: SmartiumDevicesConfiguration.self,
+            provider: SmartiumDevicesProvider()
+        ) { entry in
             SmartiumDevicesWidgetView(entry: entry)
                 .widgetURL(StTool.monitor.deepLink)
         }
@@ -80,9 +196,12 @@ struct SmartiumDevicesWidgetView: View {
 
     private let tool = StTool.monitor
 
-    /// One device per kind, iPhone first, as in the rings.
-    private var devices: [StDeviceBattery] {
-        StDeviceList.ringDevices(entry.devices)
+    /// Outer ring first: iPhone, Watch, Mac, or the chosen order.
+    private var devices: [StDeviceBattery] { entry.devices }
+
+    /// Exactly one device: the single-device layout (§2).
+    private var single: StDeviceBattery? {
+        devices.count == 1 ? devices.first : nil
     }
 
     var body: some View {
@@ -98,23 +217,53 @@ struct SmartiumDevicesWidgetView: View {
         }
     }
 
+    @ViewBuilder
     private var rings: some View {
-        StDeviceRingsMark(devices: entry.devices, track: StWidgetTheme(colorScheme).track)
+        let theme = StWidgetTheme(colorScheme)
+        if let single {
+            // §2: one large ring in the device color (r 44, stroke 7), with
+            // the icon and the percent inside.
+            ZStack {
+                StDeviceRingsMark(devices: [single], track: theme.track, byPosition: true)
+                VStack(spacing: 2) {
+                    StDeviceIcon(kind: single.kind, size: 16, color: single.rgb.color)
+                    HStack(spacing: 2) {
+                        StBigNumber(single.percentText, size: 17, color: single.isLow ? single.levelRGB.color : theme.primary)
+                        if single.isCharging {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(StTool.timer.tone)
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+            }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(devices.map { $0.spoken(isThisDevice: false) }.joined(separator: "; "))
+            .accessibilityLabel(single.spoken(isThisDevice: false))
+        } else {
+            StDeviceRingsMark(devices: devices, track: theme.track, byPosition: entry.isChosen)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(devices.map { $0.spoken(isThisDevice: false) }.joined(separator: "; "))
+        }
     }
 
     private var medium: some View {
         let first = devices.first
-        let others = devices.dropFirst()
-            .map { "\($0.shortName) \($0.percentText)" }
-            .joined(separator: " · ")
+        let caption: String
+        if let single {
+            caption = single.stateText
+        } else {
+            let others = devices.dropFirst()
+                .map { "\($0.shortName) \($0.percentText)" }
+                .joined(separator: " · ")
+            caption = others.isEmpty ? "Abra o app para ler as baterias." : others
+        }
         return StWidgetMediumLayout(
             tone: tool.tone,
             systemImage: "battery.75percent",
             brand: "Dispositivos",
-            title: Text(first.map { "\($0.shortName) \($0.percentText)" } ?? "Sem dispositivos"),
-            caption: Text(others.isEmpty ? "Abra o app para ler as baterias." : others)
+            title: Text(first.map { "\(single == nil ? $0.shortName : $0.name) \($0.percentText)" } ?? "Sem dispositivos"),
+            caption: Text(caption)
         ) {
             rings
         } actions: {
@@ -125,8 +274,14 @@ struct SmartiumDevicesWidgetView: View {
     }
 
     private var small: some View {
-        let label = devices.map { $0.percent.map(String.init) ?? "—" }.joined(separator: " · ")
-        return StWidgetSmallLayout(label: Text(label.isEmpty ? "Dispositivos" : label)) {
+        let label: String
+        if let single {
+            label = single.name
+        } else {
+            let percents = devices.map { $0.percent.map(String.init) ?? "—" }.joined(separator: " · ")
+            label = percents.isEmpty ? "Sem dispositivos" : percents
+        }
+        return StWidgetSmallLayout(label: Text(label)) {
             Link(destination: StTool.monitor.deepLink) {
                 StWidgetRoundButton(systemImage: "arrow.up.forward", tone: tool.tone)
             }
@@ -140,14 +295,15 @@ struct SmartiumDevicesWidgetView: View {
 // MARK: - Lock Screen (§4)
 
 #if os(iOS)
-/// Monochrome: the iPhone's ring, three rows of bars, or one line.
+/// Monochrome: the first device's ring, up to three rows of bars, or one
+/// line. v0.12.3 §3: the first of the widget's devices (the iPhone when the
+/// choice is automatic, since it comes first).
 private struct SmartiumDevicesAccessoryView: View {
     let devices: [StDeviceBattery]
     @Environment(\.widgetFamily) private var family
 
-    /// The iPhone, or the first device there is.
     private var main: StDeviceBattery? {
-        devices.first { $0.kind == .iphone } ?? devices.first
+        devices.first
     }
 
     var body: some View {

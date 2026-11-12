@@ -211,11 +211,25 @@ struct StDeviceIcon: View {
 /// iPhone r 44, Apple Watch r 33, Mac r 22, stroke 7 in a 100-unit viewBox,
 /// one ring per kind; a missing kind has no ring and a device without a
 /// battery gets a full one. Low battery in Coral.
+///
+/// `byPosition` (v0.12.3): the devices the user chose for the widget, in
+/// their order. The first gets r 44, the second r 33 and the third r 22,
+/// whatever their kind; anything past the third is left out.
 struct StDeviceRingsMark: View {
     /// Already ordered (`StDeviceList.ordered`); one ring per kind.
     let devices: [StDeviceBattery]
     /// Track color: the widget theme's, or the device color at 16%.
     var track: Color? = nil
+    var byPosition = false
+
+    nonisolated static let positionRadii: [CGFloat] = [44, 33, 22]
+
+    private var rings: [(device: StDeviceBattery, radius: CGFloat)] {
+        if byPosition {
+            return zip(devices, Self.positionRadii).map { ($0, $1) }
+        }
+        return StDeviceList.ringDevices(devices).map { ($0, Self.radius($0.kind)) }
+    }
 
     nonisolated static func radius(_ kind: StDeviceBattery.Kind) -> CGFloat {
         switch kind {
@@ -229,8 +243,9 @@ struct StDeviceRingsMark: View {
         GeometryReader { proxy in
             let unit = min(proxy.size.width, proxy.size.height) / 100
             ZStack {
-                ForEach(StDeviceList.ringDevices(devices)) { device in
-                    let size = Self.radius(device.kind) * 2 * unit
+                ForEach(rings, id: \.device.id) { ring in
+                    let device = ring.device
+                    let size = ring.radius * 2 * unit
                     let lineWidth = 7 * unit
                     ZStack {
                         Circle()
