@@ -169,26 +169,6 @@ struct SmartiumDevicesWidget: Widget {
     }
 }
 
-/// Short device names for the widgets: "iPhone", "Watch", "Mac".
-extension StDeviceBattery {
-    var shortName: String {
-        switch kind {
-        case .iphone: name
-        case .watch: "Watch"
-        case .mac: "Mac"
-        }
-    }
-
-    /// SF Symbol for the places that can't draw `StDeviceIcon` (inline).
-    var symbolName: String {
-        switch kind {
-        case .iphone: "iphone"
-        case .watch: "applewatch"
-        case .mac: "laptopcomputer"
-        }
-    }
-}
-
 struct SmartiumDevicesWidgetView: View {
     @Environment(\.widgetFamily) private var family
     @Environment(\.colorScheme) private var colorScheme
@@ -208,7 +188,7 @@ struct SmartiumDevicesWidgetView: View {
         switch family {
         #if os(iOS)
         case .accessoryCircular, .accessoryRectangular, .accessoryInline:
-            SmartiumDevicesAccessoryView(devices: devices)
+            StDevicesComplication(devices: devices)
         #endif
         case .systemMedium:
             medium.stWidgetBackground(tool.tone)
@@ -291,78 +271,3 @@ struct SmartiumDevicesWidgetView: View {
         }
     }
 }
-
-// MARK: - Lock Screen (§4)
-
-#if os(iOS)
-/// Monochrome: the first device's ring, up to three rows of bars, or one
-/// line. v0.12.3 §3: the first of the widget's devices (the iPhone when the
-/// choice is automatic, since it comes first).
-private struct SmartiumDevicesAccessoryView: View {
-    let devices: [StDeviceBattery]
-    @Environment(\.widgetFamily) private var family
-
-    private var main: StDeviceBattery? {
-        devices.first
-    }
-
-    var body: some View {
-        content.containerBackground(for: .widget) { Color.clear }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        switch family {
-        case .accessoryCircular:
-            if let main {
-                Gauge(value: main.ringFraction) {
-                    StDeviceIcon(kind: main.kind, size: 12, color: .primary)
-                } currentValueLabel: {
-                    VStack(spacing: 0) {
-                        StDeviceIcon(kind: main.kind, size: 11, color: .primary)
-                            .opacity(0.7)
-                        Text(main.percentText)
-                            .minimumScaleFactor(0.5)
-                    }
-                }
-                .gaugeStyle(.accessoryCircularCapacity)
-                .widgetAccentable()
-                .accessibilityLabel(main.spoken(isThisDevice: false))
-            } else {
-                ZStack {
-                    AccessoryWidgetBackground()
-                    Image(systemName: "battery.75percent")
-                }
-            }
-        case .accessoryRectangular:
-            VStack(alignment: .leading, spacing: 3) {
-                ForEach(devices) { device in
-                    HStack(spacing: 6) {
-                        StDeviceIcon(kind: device.kind, size: 13, color: .primary)
-                        ProgressView(value: device.ringFraction)
-                            .progressViewStyle(.linear)
-                            .widgetAccentable()
-                        Text(device.percentText)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .monospacedDigit()
-                            .frame(minWidth: 34, alignment: .trailing)
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(device.spoken(isThisDevice: false))
-                }
-                if devices.isEmpty {
-                    Text("Sem dispositivos")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        default:
-            if let main {
-                Label("\(main.shortName) \(main.percentText)", systemImage: main.symbolName)
-            } else {
-                Label("Dispositivos", systemImage: "battery.75percent")
-            }
-        }
-    }
-}
-#endif

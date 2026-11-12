@@ -6,7 +6,8 @@
 //  ring with the clock on the plate, "04:12 restantes", the end message and
 //  time, Pausar / Iniciar and the round Zerar. Small: the ring with the
 //  clock and a play / pause button. §4: Lock Screen (circular, rectangular,
-//  inline), monochrome, counting on their own with `timerInterval`.
+//  inline), counting on their own with `timerInterval`; since v0.12.1 they
+//  are `StTimerComplication`, shared with the watch.
 //
 
 import AppIntents
@@ -80,7 +81,7 @@ struct SmartiumTimerWidgetView: View {
     var body: some View {
         switch family {
         case .accessoryCircular, .accessoryRectangular, .accessoryInline:
-            SmartiumTimerAccessoryView(snapshot: snapshot, date: entry.date)
+            StTimerComplication(snapshot: snapshot, date: entry.date)
         case .systemMedium:
             medium.stWidgetBackground(tool.tone)
         default:
@@ -257,153 +258,4 @@ private struct SmartiumTimerClock: View {
     }
 }
 
-// MARK: - Lock Screen (§4)
-
-/// Monochrome: the system applies the glass and the color, so only
-/// `AccessoryWidgetBackground` and the default style, with opacity for
-/// hierarchy. While counting, the ring and the clock run on their own.
-private struct SmartiumTimerAccessoryView: View {
-    let snapshot: StTimerSnapshot
-    let date: Date
-    @Environment(\.widgetFamily) private var family
-
-    private var phase: StTimerSnapshot.Phase { snapshot.phase(at: date) }
-
-    private var total: TimeInterval {
-        max(snapshot.total ?? snapshot.lastDuration, 1)
-    }
-
-    /// Start of an interval that ends at `fireDate` and lasts `total`, so
-    /// the system's progress starts at the remaining fraction.
-    private var interval: ClosedRange<Date>? {
-        guard phase == .running, let fireDate = snapshot.fireDate else { return nil }
-        let start = min(fireDate.addingTimeInterval(-total), date)
-        return start...fireDate
-    }
-
-    private var remaining: TimeInterval {
-        phase == .idle ? snapshot.lastDuration : snapshot.remaining(at: date)
-    }
-
-    private var staticFraction: Double {
-        switch phase {
-        case .idle: 1
-        case .alerting: 0
-        case .running, .paused: remaining / total
-        }
-    }
-
-    var body: some View {
-        content.containerBackground(for: .widget) { Color.clear }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        switch family {
-        case .accessoryCircular: circular
-        case .accessoryRectangular: rectangular
-        default: inline
-        }
-    }
-
-    /// Ring with the icon and `4:12`.
-    private var circular: some View {
-        ZStack {
-            AccessoryWidgetBackground()
-            Group {
-                if let interval {
-                    ProgressView(timerInterval: interval, countsDown: true) {
-                        EmptyView()
-                    } currentValueLabel: {
-                        EmptyView()
-                    }
-                } else {
-                    ProgressView(value: staticFraction)
-                }
-            }
-            .progressViewStyle(.circular)
-            .padding(3)
-            VStack(spacing: 0) {
-                Image(systemName: StTool.timer.systemImage)
-                    .font(.system(size: 11, weight: .semibold))
-                    .opacity(0.7)
-                clock
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .minimumScaleFactor(0.5)
-            }
-            .padding(.horizontal, 7)
-        }
-        .widgetAccentable()
-        .accessibilityElement(children: .combine)
-    }
-
-    /// `TIMER`, "04:12 restantes" and a progress bar.
-    private var rectangular: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Label("TIMER", systemImage: StTool.timer.systemImage)
-                .font(.system(size: 12, weight: .bold))
-                .opacity(0.7)
-                .widgetAccentable()
-            Group {
-                switch phase {
-                case .alerting: Text("Encerrado!")
-                case .idle: Text("\(clock) definido")
-                case .running, .paused: Text("\(clock) restantes")
-                }
-            }
-            .font(.system(size: 17, weight: .semibold, design: .rounded))
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-            Group {
-                if let interval {
-                    ProgressView(timerInterval: interval, countsDown: true) {
-                        EmptyView()
-                    } currentValueLabel: {
-                        EmptyView()
-                    }
-                } else {
-                    ProgressView(value: staticFraction)
-                }
-            }
-            .progressViewStyle(.linear)
-            .widgetAccentable()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// Icon and "Timer · 04:12".
-    private var inline: some View {
-        ViewThatFits {
-            Label {
-                Text("Timer · \(clock)")
-            } icon: {
-                Image(systemName: StTool.timer.systemImage)
-            }
-            Label {
-                clock
-            } icon: {
-                Image(systemName: StTool.timer.systemImage)
-            }
-        }
-    }
-
-    private var clock: Text {
-        if let interval {
-            return Text(timerInterval: date...interval.upperBound, countsDown: true)
-        }
-        return Text(Self.short(remaining))
-    }
-
-    /// `4:12`, or `1:00:00`: the Lock Screen drops the leading zero.
-    private static func short(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds.rounded(.up)))
-        let hours = total / 3_600
-        let minutes = (total % 3_600) / 60
-        let rest = total % 60
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, rest)
-            : String(format: "%d:%02d", minutes, rest)
-    }
-}
 #endif
