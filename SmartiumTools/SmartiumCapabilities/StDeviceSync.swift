@@ -218,10 +218,7 @@ final class StDeviceSync {
     /// The list for the Dispositivos widget (v0.12 §3.2): the extension
     /// can't read the key-value store, so the app copies it to the App Group.
     private func publishSurfaces(_ devices: [StDeviceBattery]? = nil) {
-        let devices = devices ?? self.devices
-        guard devices != StLiveSurfaces.devices else { return }
-        StLiveSurfaces.devices = devices
-        StLiveSurfaces.reloadDevices()
+        StLiveSurfaces.publishDevices(devices ?? self.devices)
     }
 
     // MARK: Key-value store

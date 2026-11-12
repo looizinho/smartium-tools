@@ -21,7 +21,7 @@ public extension Notification.Name {
 /// Shared state persisted inside the `group.dev.smartium.tools` App Group container
 /// so the main app, Home Screen Widgets, and Live Activities stay in sync.
 nonisolated public struct ToolSharedState: Codable, Sendable, Equatable {
-    public static let appGroupIdentifier = "group.dev.smartium.tools"
+    public static let appGroupIdentifier = StLiveSurfaces.appGroupIdentifier
     private static let storageKey = "dev.smartium.tools.sharedState"
 
     public var activeToolName: String

@@ -1,10 +1,12 @@
 //
-//  SmartiumLiveSurfaces.swift
+//  StLiveSurfaces.swift
 //  SmartiumTools
 //
 //  App Group snapshots read by the Control Center controls and the Timer and
 //  Monitor widgets (handoff v0.5). The app writes them; the widget extension
 //  only reads them.
+//  v0.12.1 §2: in `Shared/` so the watch app can mirror what the iPhone
+//  sends into the watch's App Group, for the watch's own complications.
 //
 
 import AppIntents
@@ -36,8 +38,12 @@ nonisolated enum StLiveSurfaces {
         static let devices = "dev.smartium.tools.devices"
     }
 
+    /// Same as `ToolSharedState.appGroupIdentifier`, which the watch can't
+    /// see (it lives with the Orb's state). Keep the two identical.
+    static let appGroupIdentifier = "group.dev.smartium.tools"
+
     private static var defaults: UserDefaults {
-        UserDefaults(suiteName: ToolSharedState.appGroupIdentifier) ?? .standard
+        UserDefaults(suiteName: appGroupIdentifier) ?? .standard
     }
 
     // MARK: Timer
@@ -61,6 +67,14 @@ nonisolated enum StLiveSurfaces {
     static var metrics: StMetricsSnapshot? {
         get { read(Key.metrics) }
         set { write(newValue, Key.metrics) }
+    }
+
+    /// Stores the sample and reloads the Monitor widgets (the watch, which
+    /// gets a new sample at most every 30 s).
+    static func publishMetrics(_ snapshot: StMetricsSnapshot?) {
+        guard snapshot != metrics else { return }
+        metrics = snapshot
+        reloadMonitor()
     }
 
     /// Metric pinned to the Monitor hero (`settings.monitor.pinnedMetric`, v0.6),
@@ -95,6 +109,13 @@ nonisolated enum StLiveSurfaces {
     static var devices: [StDeviceBattery] {
         get { read(Key.devices) ?? [] }
         set { write(newValue, Key.devices) }
+    }
+
+    /// Stores the list and reloads the Dispositivos widgets when it changed.
+    static func publishDevices(_ list: [StDeviceBattery]) {
+        guard list != devices else { return }
+        devices = list
+        reloadDevices()
     }
 
     // MARK: Orb
