@@ -33,8 +33,8 @@ struct SmartiumTimerLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: AlarmAttributes<SmartiumAlarmMetadata>.self) { context in
             let tool = context.attributes.metadata?.tool ?? .timer
+            // The banner sets its own background tint, from the system theme.
             SmartiumTimerBannerView(state: context.state, tool: tool)
-                .activityBackgroundTint(Color.black.opacity(0.9))
                 .activitySystemActionForegroundColor(tool.tone)
                 // v0.8: always open on the owning tool's tab.
                 .widgetURL(tool.deepLink)
@@ -120,7 +120,7 @@ private struct SmartiumTimerCountdownText: View {
     }
 }
 
-/// Pausar/Retomar and Reiniciar in the Live Activity (v0.5). The intents are
+/// Pausar/Retomar and Zerar in the Live Activity (v0.5; Zerar since v0.12.2). The intents are
 /// `LiveActivityIntent`s, so they run in the app process without opening it
 /// and keep the Timer widgets and control in step. A ringing timer only gets
 /// the stop button.
@@ -166,7 +166,7 @@ private struct SmartiumTimerActivityButtons: View {
                 .overlay(Circle().strokeBorder(StTool.voice.opacity(0.35), lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Reiniciar")
+        .accessibilityLabel("Zerar")
     }
 }
 
@@ -190,11 +190,16 @@ private nonisolated enum SmartiumTimerStatus {
     }
 }
 
+/// Lock Screen and banner card. v0.12.2 §3: follows the system theme, like
+/// the widgets (`StWidgetTheme`); the Dynamic Island stays dark. The tool
+/// color doesn't change between themes.
 private struct SmartiumTimerBannerView: View {
     let state: AlarmPresentationState
     let tool: StTool
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let theme = StWidgetTheme(colorScheme)
         HStack(spacing: 14) {
             SmartiumIslandIcon(tool: tool, size: 44)
 
@@ -204,7 +209,7 @@ private struct SmartiumTimerBannerView: View {
                     .foregroundStyle(tool.tone)
                 Text(SmartiumTimerStatus.text(for: state))
                     .font(StFont.body(15, .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.primary)
             }
 
             Spacer()
@@ -220,12 +225,13 @@ private struct SmartiumTimerBannerView: View {
         .padding(14)
         .background(
             RadialGradient(
-                colors: [tool.opacity(0.24), .clear],
+                colors: [tool.opacity(theme.isDark ? 0.24 : 0.14), .clear],
                 center: .topTrailing,
                 startRadius: 8,
                 endRadius: 180
             )
         )
+        .activityBackgroundTint(theme.isDark ? Color.black.opacity(0.9) : StWidgetTheme.paper)
     }
 }
 #endif
