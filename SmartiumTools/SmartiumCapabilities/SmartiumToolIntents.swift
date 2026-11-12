@@ -96,7 +96,15 @@ struct ToggleTimerIntent: SetValueIntent, LiveActivityIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         #if SMARTIUM_APP
-        try await StTimerService.setRunning(value)
+        let started = Date.now
+        StTimerService.trace("ToggleTimerIntent(\(value)) começou")
+        do {
+            try await StTimerService.setRunning(value)
+            StTimerService.trace("ToggleTimerIntent(\(value)) terminou em \(Int(Date.now.timeIntervalSince(started) * 1000)) ms")
+        } catch {
+            StTimerService.trace("ToggleTimerIntent(\(value)) falhou: \(error)")
+            throw error
+        }
         #endif
         return .result()
     }
@@ -131,7 +139,14 @@ struct ResetTimerIntent: LiveActivityIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         #if SMARTIUM_APP
-        try StTimerService.reset()
+        StTimerService.trace("ResetTimerIntent começou")
+        do {
+            try StTimerService.reset()
+            StTimerService.trace("ResetTimerIntent terminou")
+        } catch {
+            StTimerService.trace("ResetTimerIntent falhou: \(error)")
+            throw error
+        }
         #endif
         return .result()
     }

@@ -14,6 +14,8 @@ import SwiftUI
 #if SMARTIUM_APP && canImport(AlarmKit) && os(iOS)
 import ActivityKit
 import AlarmKit
+import OSLog
+import UIKit
 
 @MainActor
 enum StTimerService {
@@ -81,6 +83,7 @@ enum StTimerService {
     static func setRunning(_ running: Bool) async throws {
         var snapshot = StLiveSurfaces.timer
         let now = Date.now
+        trace("setRunning(\(running)) app=\(applicationStateName) auth=\(AlarmManager.shared.authorizationState) alarm=\(activeAlarm.map { "\($0.state)" } ?? "nenhum") snapshot=\(snapshot.phase.rawValue)")
 
         guard let alarm = activeAlarm else {
             guard running else { return }
@@ -107,6 +110,7 @@ enum StTimerService {
         }
         snapshot.total = snapshot.total ?? liveTotal()
         commit(snapshot)
+        trace("setRunning(\(running)) gravou \(snapshot.phase.rawValue)")
     }
 
     /// The system alert's stop button already stopped the alarm.
@@ -161,12 +165,14 @@ enum StTimerService {
     private static func start(_ duration: TimeInterval, message: String) async throws {
         let duration = min(max(duration, 1), StTimer.maxDuration)
         try await schedule(duration: duration, message: message)
+        trace("start: AlarmKit agendou \(Int(duration)) s; alarmes=\((try? AlarmManager.shared.alarms.map { "\($0.state)" }) ?? [])")
         var snapshot = StLiveSurfaces.timer
         snapshot.phase = .running
         snapshot.fireDate = Date.now.addingTimeInterval(duration)
         snapshot.pausedRemaining = nil
         snapshot.total = duration
         commit(snapshot)
+        trace("start: snapshot running, fim \(snapshot.fireDate?.formatted(date: .omitted, time: .standard) ?? "-")")
     }
 
     // MARK: Snapshot
@@ -301,6 +307,32 @@ enum StTimerService {
     private static func save(_ snapshot: StTimerSnapshot) {
         StLiveSurfaces.publishTimer(snapshot)
         StWatchSync.shared.timerChanged(snapshot)
+    }
+
+    // MARK: Diagnostics (v0.13 §2)
+
+    private static let logger = Logger(subsystem: "dev.smartium.tools", category: "timerIntent")
+    private static let traceKey = "dev.smartium.tools.timerIntentTrace"
+
+    /// Logs a step of the timer intents (Console: `dev.smartium.tools`,
+    /// `timerIntent`) and keeps the last 30 lines in the app's standard
+    /// defaults, so a run from a widget with the app closed can be read
+    /// from the container without opening the app.
+    static func trace(_ line: String) {
+        let stamped = "\(Date.now.formatted(date: .omitted, time: .standard)) \(line)"
+        logger.notice("\(stamped, privacy: .public)")
+        var lines = UserDefaults.standard.stringArray(forKey: traceKey) ?? []
+        lines.append(stamped)
+        UserDefaults.standard.set(Array(lines.suffix(30)), forKey: traceKey)
+    }
+
+    private static var applicationStateName: String {
+        switch UIApplication.shared.applicationState {
+        case .active: "ativo"
+        case .inactive: "inativo"
+        case .background: "segundo plano"
+        @unknown default: "?"
+        }
     }
 
     private static func localizedTitle(_ text: String) -> LocalizedStringResource {
