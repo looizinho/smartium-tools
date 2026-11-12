@@ -68,6 +68,32 @@ nonisolated struct StDeviceBattery: Codable, Sendable, Hashable, Identifiable {
         isLow ? StTool.voice.rgb : kind.rgb
     }
 
+    /// v0.13 §7: each device's icon next to its percent, in the ring's
+    /// color when `colored` ("📱25  ⌚80  💻100"), in the rings' order. Only
+    /// the first `icons` devices get one: a label that doesn't fit drops an
+    /// icon, never a number.
+    static func percentsLabel(_ devices: [StDeviceBattery], icons: Int = 3, colored: Bool = true) -> Text {
+        var label: Text?
+        for (index, device) in devices.enumerated() {
+            var part = Text(verbatim: device.percent.map(String.init) ?? "—")
+            if index < icons {
+                let icon = Text(Image(systemName: device.kind.symbolName))
+                part = Text("\(colored ? icon.foregroundStyle(device.rgb.color) : icon)\u{2009}\(part)")
+            }
+            label = label.map { Text("\($0)  \(part)") } ?? part
+        }
+        return label ?? Text(verbatim: "")
+    }
+
+    /// What to try when `percentsLabel` with every icon doesn't fit: one
+    /// icon fewer each time, down to the numbers alone, so a number is never
+    /// cut (v0.13 §7; seen cut on the Lock Screen with two devices).
+    static func percentsFallbacks(_ devices: [StDeviceBattery], colored: Bool = true) -> [Text] {
+        stride(from: devices.count - 1, through: 0, by: -1).map {
+            percentsLabel(devices, icons: $0, colored: colored)
+        }
+    }
+
     /// "iPhone, este aparelho, 82 por cento, na bateria" (§1.7).
     func spoken(isThisDevice: Bool) -> String {
         [
@@ -87,6 +113,15 @@ extension StDeviceBattery.Kind {
         case .iphone: StAccent.sky
         case .watch: StTool.timer.rgb
         case .mac: StTool.orb.rgb
+        }
+    }
+
+    /// SF Symbol for text labels and the inline complication.
+    nonisolated var symbolName: String {
+        switch self {
+        case .iphone: "iphone"
+        case .watch: "applewatch"
+        case .mac: "laptopcomputer"
         }
     }
 

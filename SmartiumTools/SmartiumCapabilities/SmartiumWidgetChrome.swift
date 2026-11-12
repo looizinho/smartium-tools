@@ -150,6 +150,8 @@ struct StWidgetCapsule: View {
 /// the middle, a 12 pt label at the foot.
 struct StWidgetSmallLayout<Element: View, Corner: View>: View {
     let label: Text
+    /// Tried in order instead of `label` when it doesn't fit (v0.13 §7).
+    var compactLabels: [Text] = []
     @ViewBuilder let corner: () -> Corner
     @ViewBuilder let element: () -> Element
     @Environment(\.colorScheme) private var colorScheme
@@ -168,13 +170,22 @@ struct StWidgetSmallLayout<Element: View, Corner: View>: View {
             element()
                 .frame(width: 74, height: 74)
 
-            label
-                .font(StFont.body(12, .semibold))
-                .foregroundStyle(theme.primary)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            ViewThatFits(in: .horizontal) {
+                styled(label, theme)
+                ForEach(compactLabels.indices, id: \.self) { index in
+                    styled(compactLabels[index], theme)
+                }
+            }
         }
+    }
+
+    private func styled(_ text: Text, _ theme: StWidgetTheme) -> some View {
+        text
+            .font(StFont.body(12, .semibold))
+            .foregroundStyle(theme.primary)
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
     }
 }
 

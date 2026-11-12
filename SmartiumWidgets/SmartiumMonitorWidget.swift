@@ -5,7 +5,8 @@
 //  Monitor widgets. v0.12 §2: the Orb's layout and system theme, with the
 //  chosen metric's ring on the plate, "CPU 37%" and "Abrir Monitor". §3.1:
 //  battery is a metric too (Âmbar; Coral when low; "—" with a full ring on a
-//  Mac without one). §4: Lock Screen (circular, rectangular, inline).
+//  Mac without one); since v0.13 §7 only through "Fixada no app", when the
+//  app pins it. §4: Lock Screen (circular, rectangular, inline).
 //  Values are the app's last sample; GPU stays simulated on iOS.
 //
 
@@ -25,9 +26,13 @@ struct SmartiumMonitorConfiguration: WidgetConfigurationIntent {
 
 /// The metric choice. `pinned` follows the metric pinned in the app (v0.6);
 /// the others keep `StWidgetMetric`'s raw values, so widgets configured
-/// before an option existed keep their metric. `battery` is new in v0.12.
+/// before an option existed keep their metric.
+/// v0.13 §7 undoes v0.12 §3.1: Bateria is no longer offered, since the
+/// batteries have their own widget. A widget already set to it no longer
+/// matches a case, so the parameter falls back to its default, "Fixada no
+/// app", instead of showing nothing.
 enum SmartiumMonitorMetricChoice: String, AppEnum {
-    case pinned, cpu, gpu, memory, disk, battery
+    case pinned, cpu, gpu, memory, disk
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Métrica"
     static let caseDisplayRepresentations: [SmartiumMonitorMetricChoice: DisplayRepresentation] = [
@@ -36,7 +41,6 @@ enum SmartiumMonitorMetricChoice: String, AppEnum {
         .gpu: "GPU",
         .memory: "RAM",
         .disk: "Disco",
-        .battery: "Bateria",
     ]
 
     var metric: StWidgetMetric {

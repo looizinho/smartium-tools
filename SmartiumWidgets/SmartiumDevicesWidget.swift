@@ -253,15 +253,20 @@ struct SmartiumDevicesWidgetView: View {
         }
     }
 
+    /// v0.13 §7: each device's icon, in its ring's color, by its percent;
+    /// when that doesn't fit, one icon fewer each time, never a cut number.
     private var small: some View {
-        let label: String
+        let label: Text
+        var compact: [Text] = []
         if let single {
-            label = single.name
+            label = Text(single.name)
+        } else if devices.isEmpty {
+            label = Text("Sem dispositivos")
         } else {
-            let percents = devices.map { $0.percent.map(String.init) ?? "—" }.joined(separator: " · ")
-            label = percents.isEmpty ? "Sem dispositivos" : percents
+            label = StDeviceBattery.percentsLabel(devices)
+            compact = StDeviceBattery.percentsFallbacks(devices)
         }
-        return StWidgetSmallLayout(label: Text(label)) {
+        return StWidgetSmallLayout(label: label, compactLabels: compact) {
             Link(destination: StTool.monitor.deepLink) {
                 StWidgetRoundButton(systemImage: "arrow.up.forward", tone: tool.tone)
             }

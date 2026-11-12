@@ -43,9 +43,7 @@ nonisolated enum StComplicationIcon: Sendable {
     var symbolName: String {
         switch self {
         case .symbol(let name): name
-        case .device(.iphone): "iphone"
-        case .device(.watch): "applewatch"
-        case .device(.mac): "laptopcomputer"
+        case .device(let kind): kind.symbolName
         }
     }
 }
@@ -63,6 +61,8 @@ struct StComplication: View {
     var shortValue: Text? = nil
     /// The value's own color in `.fullColor` (Coral for a low battery).
     var valueTone: Color? = nil
+    /// Rectangular values to try, in order, when `value` doesn't fit (v0.13 §7).
+    var compactValues: [Text] = []
 
     @Environment(\.widgetFamily) private var family
     @Environment(\.widgetRenderingMode) private var renderingMode
@@ -107,16 +107,25 @@ struct StComplication: View {
                     .foregroundStyle(accent)
                     .opacity(isFullColor ? 1 : 0.7)
                     .lineLimit(1)
-                value
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(isFullColor ? (valueTone ?? .primary) : .primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                ViewThatFits(in: .horizontal) {
+                    rectangularValue(value)
+                    ForEach(compactValues.indices, id: \.self) { index in
+                        rectangularValue(compactValues[index])
+                    }
+                }
             }
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private func rectangularValue(_ text: Text) -> some View {
+        text
+            .font(.system(size: 17, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(isFullColor ? (valueTone ?? .primary) : .primary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
     }
 
     /// 44 pt: a ring with the icon inside, or the icon on the background.
@@ -328,6 +337,7 @@ struct StDevicesComplication: View {
     /// Already in the widget's order, at most three.
     let devices: [StDeviceBattery]
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
 
     private var lowest: StDeviceBattery? {
         devices.filter { $0.level != nil }.min { ($0.level ?? 1) < ($1.level ?? 1) } ?? devices.first
@@ -341,9 +351,12 @@ struct StDevicesComplication: View {
                 tone: shown.levelRGB.color,
                 icon: .device(shown.kind),
                 progress: .value(shown.ringFraction),
-                value: Text(devices.map { $0.percent.map(String.init) ?? "—" }.joined(separator: " · ")),
+                // v0.13 §7: each device's icon by its percent, in the
+                // ring's color only in full color.
+                value: StDeviceBattery.percentsLabel(devices, colored: renderingMode == .fullColor),
                 shortValue: Text(family == .accessoryInline ? "\(shown.shortName) \(shown.percentText)" : shown.percentText),
-                valueTone: shown.isLow ? shown.levelRGB.color : nil
+                valueTone: shown.isLow ? shown.levelRGB.color : nil,
+                compactValues: StDeviceBattery.percentsFallbacks(devices, colored: renderingMode == .fullColor)
             )
         } else {
             StComplication(
