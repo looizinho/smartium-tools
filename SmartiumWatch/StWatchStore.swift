@@ -6,6 +6,10 @@
 //  the iPhone, keeps the last one on disk so the app opens with it even
 //  without a connection, and says when the data is stale. Since v0.11 it
 //  also reads the watch's own battery and sends it to the iPhone.
+//  v0.12.1 §2: everything it receives is mirrored into the watch's App
+//  Group (`StLiveSurfaces`), where the watch's complications read it, and
+//  their timelines reload. Before, only the app's own cache was written and
+//  the complications froze on their first value.
 //
 
 import Foundation
@@ -70,6 +74,7 @@ final class StWatchStore {
     func activate() {
         link.activate()
         sayHello()
+        mirror()
     }
 
     /// On opening or becoming active: the iPhone answers with its state, and
@@ -129,6 +134,7 @@ final class StWatchStore {
         lastSentBattery = battery
         lastBatterySend = .now
         link.sendBattery(battery)
+        StLiveSurfaces.publishDevices(devices)
     }
 
     /// No iPhone: the session can't reach it and the last data is old.
@@ -148,6 +154,19 @@ final class StWatchStore {
             focusEvent = FocusEvent(tool: focus.tool, id: focus.at)
         }
         save()
+        mirror()
+    }
+
+    /// Copies the state to the App Group for the complications. Each
+    /// `publish` writes only what changed and reloads that widget's
+    /// timelines, so an unchanged state costs no reload.
+    private func mirror() {
+        if state.timer != StLiveSurfaces.timer {
+            StLiveSurfaces.publishTimer(state.timer)
+        }
+        StLiveSurfaces.publishMetrics(state.monitor.snapshot)
+        StLiveSurfaces.publishPinnedMetric(state.monitor.pinned)
+        StLiveSurfaces.publishDevices(devices)
     }
 
     private func reachabilityChanged(_ reachable: Bool) {
