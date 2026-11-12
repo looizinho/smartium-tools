@@ -171,7 +171,7 @@ struct SmartiumMonitorWidgetView: View {
         switch family {
         #if os(iOS)
         case .accessoryCircular, .accessoryRectangular, .accessoryInline:
-            SmartiumMonitorAccessoryView(reading: reading)
+            StMonitorComplication(metric: entry.metric, metrics: entry.metrics)
         #endif
         case .systemMedium:
             medium.stWidgetBackground(tool.tone)
@@ -223,53 +223,3 @@ struct SmartiumMonitorWidgetView: View {
     }
 }
 
-// MARK: - Lock Screen (§4)
-
-#if os(iOS)
-/// Monochrome: the pinned (or chosen) metric's ring, value and bar.
-private struct SmartiumMonitorAccessoryView: View {
-    let reading: SmartiumMetricReading
-    @Environment(\.widgetFamily) private var family
-
-    var body: some View {
-        content.containerBackground(for: .widget) { Color.clear }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        switch family {
-        case .accessoryCircular:
-            Gauge(value: reading.fraction) {
-                Image(systemName: reading.metric.systemImage)
-            } currentValueLabel: {
-                VStack(spacing: 0) {
-                    Image(systemName: reading.metric.systemImage)
-                        .font(.system(size: 10, weight: .semibold))
-                        .opacity(0.7)
-                    Text(reading.percentText)
-                        .minimumScaleFactor(0.5)
-                }
-            }
-            .gaugeStyle(.accessoryCircularCapacity)
-            .widgetAccentable()
-        case .accessoryRectangular:
-            VStack(alignment: .leading, spacing: 2) {
-                Label(reading.metric.label.uppercased(), systemImage: reading.metric.systemImage)
-                    .font(.system(size: 12, weight: .bold))
-                    .opacity(0.7)
-                    .widgetAccentable()
-                Text(reading.percentText)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                ProgressView(value: reading.fraction)
-                    .progressViewStyle(.linear)
-                    .widgetAccentable()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        default:
-            Label("\(reading.metric.label) \(reading.percentText)", systemImage: reading.metric.systemImage)
-        }
-    }
-}
-#endif
