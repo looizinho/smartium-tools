@@ -41,8 +41,10 @@ nonisolated struct StWidgetTheme: Sendable {
     func button(_ tone: Color) -> Color { tone.opacity(isDark ? 0.85 : 0.90) }
 }
 
-/// Black at 92% (dark) or #FAF7FF (light), with the tool's radial glow from
-/// the top trailing corner at 28% / 16%.
+/// v0.13 §6.2: the system material over the wallpaper instead of the flat
+/// black at 92% / #FAF7FF, with the tool's radial glow from the top
+/// trailing corner, much fainter: 12% (dark) / 8% (light). Text, track and
+/// plate keep `StWidgetTheme`, so contrast stays known.
 struct StWidgetBackground: View {
     let tone: Color
     @Environment(\.colorScheme) private var colorScheme
@@ -50,13 +52,9 @@ struct StWidgetBackground: View {
     var body: some View {
         let isDark = colorScheme == .dark
         ZStack {
-            if isDark {
-                Color.black.opacity(0.92)
-            } else {
-                StWidgetTheme.paper
-            }
+            Rectangle().fill(.thinMaterial)
             RadialGradient(
-                colors: [tone.opacity(isDark ? 0.28 : 0.16), Color.clear],
+                colors: [tone.opacity(isDark ? 0.12 : 0.08), Color.clear],
                 center: .topTrailing,
                 startRadius: 8,
                 endRadius: 160

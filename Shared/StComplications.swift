@@ -73,8 +73,17 @@ struct StComplication: View {
     private var accent: Color { isFullColor ? tone : .primary }
 
     var body: some View {
+        #if os(watchOS)
+        // v0.13 §6.1: no opaque fill of its own on the watch. Leaving the
+        // background out made watchOS show "Please adopt containerBackground
+        // API", so it declares the system's translucent fill instead, like
+        // the mirrored iPhone cards.
+        content
+            .containerBackground(.fill.tertiary, for: .widget)
+        #else
         content
             .containerBackground(for: .widget) { Color.clear }
+        #endif
     }
 
     @ViewBuilder

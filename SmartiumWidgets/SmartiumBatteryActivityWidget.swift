@@ -123,13 +123,13 @@ private struct SmartiumBatteryBody: View {
     }
 }
 
-/// Lock Screen card, in the system theme like the Orb's banner.
+/// Lock Screen card. v0.13 §6.3: the system material and the dark scheme,
+/// like the Orb's and the Timer's banners.
 private struct SmartiumBatteryLockScreenView: View {
     let state: StBatteryActivityAttributes.ContentState
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let theme = StWidgetTheme(colorScheme)
+        let theme = StWidgetTheme(.dark)
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 SmartiumBatteryHeader()
@@ -140,20 +140,15 @@ private struct SmartiumBatteryLockScreenView: View {
         }
         .padding(14)
         .background {
-            ZStack {
-                if theme.isDark {
-                    Color.black.opacity(0.90)
-                } else {
-                    StWidgetTheme.paper.opacity(0.94)
-                }
-                RadialGradient(
-                    colors: [StTool.orb.opacity(theme.isDark ? 0.24 : 0.14), Color.clear],
-                    center: .topTrailing,
-                    startRadius: 8,
-                    endRadius: 180
-                )
-            }
+            RadialGradient(
+                colors: [StTool.orb.opacity(0.24), Color.clear],
+                center: .topTrailing,
+                startRadius: 8,
+                endRadius: 180
+            )
         }
+        .environment(\.colorScheme, .dark)
+        .activityBackgroundTint(StTool.orb.opacity(0.18))
     }
 }
 #endif
