@@ -4,7 +4,7 @@
 //
 //  Timer widgets. v0.12 §2: the Orb's layout and system theme. Medium: the
 //  ring with the clock on the plate, "04:12 restantes", the end message and
-//  time, Pausar / Iniciar and the round Reiniciar. Small: the ring with the
+//  time, Pausar / Iniciar and the round Zerar. Small: the ring with the
 //  clock and a play / pause button. §4: Lock Screen (circular, rectangular,
 //  inline), monochrome, counting on their own with `timerInterval`.
 //
@@ -31,11 +31,17 @@ struct SmartiumTimerProvider: TimelineProvider {
     /// The app reloads on every change. While counting, entries move the
     /// ring (about 60 steps, at least 15 s apart; the clock counts by itself)
     /// up to the end.
+    ///
+    /// v0.12.1 §3: a safety net in case a reload gets lost. The timeline asks
+    /// again at the end while counting, and every 30 min otherwise, so a
+    /// missed reload heals by itself instead of freezing the widget.
     func getTimeline(in context: Context, completion: @escaping (Timeline<SmartiumTimerEntry>) -> Void) {
         let snapshot = StLiveSurfaces.timer
         let now = Date.now
         var entries = [SmartiumTimerEntry(date: now, snapshot: snapshot)]
+        var refresh = now.addingTimeInterval(30 * 60)
         if snapshot.phase(at: now) == .running, let fireDate = snapshot.fireDate {
+            refresh = fireDate
             let step = max(15, fireDate.timeIntervalSince(now) / 60)
             var date = now.addingTimeInterval(step)
             while date < fireDate {
@@ -44,7 +50,7 @@ struct SmartiumTimerProvider: TimelineProvider {
             }
             entries.append(SmartiumTimerEntry(date: fireDate, snapshot: snapshot))
         }
-        completion(Timeline(entries: entries, policy: .never))
+        completion(Timeline(entries: entries, policy: .after(refresh)))
     }
 }
 
@@ -55,7 +61,7 @@ struct SmartiumTimerWidget: Widget {
                 .widgetURL(StTool.timer.deepLink)
         }
         .configurationDisplayName("Timer")
-        .description("Tempo restante do timer, com pausar e reiniciar.")
+        .description("Tempo restante do timer, com pausar e zerar.")
         .supportedFamilies([
             .systemSmall, .systemMedium,
             .accessoryCircular, .accessoryRectangular, .accessoryInline,
@@ -108,7 +114,7 @@ struct SmartiumTimerWidgetView: View {
                     .overlay(Circle().strokeBorder(StTool.voice.opacity(0.35), lineWidth: 1))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Reiniciar")
+            .accessibilityLabel("Zerar")
         }
     }
 
@@ -211,6 +217,12 @@ struct SmartiumTimerWidgetView: View {
 }
 
 /// The clock inside the ring: counts by itself while running.
+///
+/// v0.12.2 §2: painted through a mask, like `StBigNumber`. Since the Xcode
+/// 27.3 SDK a `Text` in Digital Dotted draws its digits black whatever its
+/// `foregroundStyle`, which hid the clock on the dark widget. The mask only
+/// uses the glyphs' alpha, so the theme color always shows, and the
+/// `Text(timerInterval:)` inside it keeps counting on its own.
 private struct SmartiumTimerClock: View {
     let snapshot: StTimerSnapshot
     let date: Date
@@ -219,6 +231,17 @@ private struct SmartiumTimerClock: View {
 
     var body: some View {
         let phase = snapshot.phase(at: date)
+        clockText(phase)
+            .foregroundStyle(.clear)
+            .overlay {
+                StWidgetTheme(colorScheme).primary
+                    .opacity(phase == .idle ? 0.55 : 1)
+                    .mask { clockText(phase) }
+            }
+            .accessibilityElement(children: .combine)
+    }
+
+    private func clockText(_ phase: StTimerSnapshot.Phase) -> some View {
         Group {
             if phase == .running, let fireDate = snapshot.fireDate {
                 Text(timerInterval: date...fireDate, countsDown: true)
@@ -227,7 +250,6 @@ private struct SmartiumTimerClock: View {
             }
         }
         .font(StFont.bigNumber(size))
-        .foregroundStyle(StWidgetTheme(colorScheme).primary.opacity(phase == .idle ? 0.55 : 1))
         .monospacedDigit()
         .multilineTextAlignment(.center)
         .lineLimit(1)
