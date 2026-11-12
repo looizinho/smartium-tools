@@ -42,9 +42,18 @@ nonisolated enum StLiveSurfaces {
 
     // MARK: Timer
 
+    /// Read-only: writes go through `publishTimer(_:)`, so none of them
+    /// can skip the reload (v0.12.1 §3).
     static var timer: StTimerSnapshot {
-        get { read(Key.timer) ?? StTimerSnapshot() }
-        set { write(newValue, Key.timer) }
+        read(Key.timer) ?? StTimerSnapshot()
+    }
+
+    /// Stores the timer and reloads the Timer widgets and control. Their
+    /// timeline only changes on a reload, so a write without one left the
+    /// placed widget frozen on its last state (v0.12.1 §3).
+    static func publishTimer(_ snapshot: StTimerSnapshot) {
+        write(snapshot, Key.timer)
+        reloadTimer()
     }
 
     // MARK: Monitor

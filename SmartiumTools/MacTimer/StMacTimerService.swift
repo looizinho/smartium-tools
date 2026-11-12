@@ -102,7 +102,7 @@ final class StMacTimerService: NSObject {
         var snapshot = StLiveSurfaces.timer
         snapshot.lastDuration = duration
         snapshot.message = message
-        StLiveSurfaces.timer = snapshot
+        StLiveSurfaces.publishTimer(snapshot)
         commit()
         startTicking()
         scheduleNotification()
@@ -201,7 +201,7 @@ final class StMacTimerService: NSObject {
         var snapshot = StLiveSurfaces.timer
         snapshot.message = remote.message
         snapshot.lastDuration = remote.lastDuration
-        StLiveSurfaces.timer = snapshot
+        StLiveSurfaces.publishTimer(snapshot)
         publish()
     }
 
@@ -361,8 +361,7 @@ final class StMacTimerService: NSObject {
         snapshot.fireDate = fireDate
         snapshot.pausedRemaining = pausedRemaining
         snapshot.total = total > 0 ? total : nil
-        StLiveSurfaces.timer = snapshot
-        StLiveSurfaces.reloadTimer()
+        StLiveSurfaces.publishTimer(snapshot)
         return snapshot
     }
 }

@@ -144,13 +144,18 @@ enum StTimerService {
         return nil
     }
 
-    /// "Reiniciar": counts the full total again from the start.
-    static func restart() async throws {
-        let snapshot = StLiveSurfaces.timer
+    /// "Zerar" (v0.12.2 §1): back to the set duration and stopped, as the
+    /// Timer screen's button does. `lastDuration` stays, so Iniciar starts
+    /// it again from the top.
+    static func reset() throws {
         if let alarm = activeAlarm {
             try AlarmManager.shared.cancel(id: alarm.id)
         }
-        try await start(snapshot.total ?? snapshot.lastDuration, message: snapshot.message)
+        var snapshot = StLiveSurfaces.timer
+        snapshot.phase = .idle
+        snapshot.fireDate = nil
+        snapshot.pausedRemaining = nil
+        commit(snapshot)
     }
 
     private static func start(_ duration: TimeInterval, message: String) async throws {
@@ -253,7 +258,7 @@ enum StTimerService {
             // The end: a timer still counting here rings on its own, and one
             // already ringing keeps ringing. Only a paused one is out of step.
             guard alarm?.state == .paused, let alarm else {
-                StLiveSurfaces.timer = snapshot
+                StLiveSurfaces.publishTimer(snapshot)
                 return
             }
             try? AlarmManager.shared.cancel(id: alarm.id)
@@ -294,8 +299,7 @@ enum StTimerService {
     }
 
     private static func save(_ snapshot: StTimerSnapshot) {
-        StLiveSurfaces.timer = snapshot
-        StLiveSurfaces.reloadTimer()
+        StLiveSurfaces.publishTimer(snapshot)
         StWatchSync.shared.timerChanged(snapshot)
     }
 

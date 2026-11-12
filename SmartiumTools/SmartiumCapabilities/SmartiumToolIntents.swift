@@ -120,17 +120,18 @@ struct StopTimerIntent: LiveActivityIntent {
     }
 }
 
-/// Timer widget: counts the full duration again from the start.
+/// Timer widget and Live Activity: back to the set duration, stopped, as the
+/// app's "Zerar" (v0.12.2 §1). Iniciar starts it again.
 struct ResetTimerIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = "Reiniciar o timer"
-    static let description = IntentDescription("Recomeça o timer do SmartiumTools do início.")
+    static let title: LocalizedStringResource = "Zerar o timer"
+    static let description = IntentDescription("Volta o timer do SmartiumTools ao tempo definido, parado.")
 
     init() {}
 
     @MainActor
     func perform() async throws -> some IntentResult {
         #if SMARTIUM_APP
-        try await StTimerService.restart()
+        try StTimerService.reset()
         #endif
         return .result()
     }
