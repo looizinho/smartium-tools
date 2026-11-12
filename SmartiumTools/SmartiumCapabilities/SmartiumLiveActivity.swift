@@ -59,7 +59,7 @@ nonisolated public struct SmartiumActivityAttributes: ActivityAttributes, Sendab
     public var toolIdentifier: String
     public var toolTitle: String
 
-    public init(toolIdentifier: String = UUID().uuidString, toolTitle: String = "SmartiumTools") {
+    public init(toolIdentifier: String = UUID().uuidString, toolTitle: String = "Orb") {
         self.toolIdentifier = toolIdentifier
         self.toolTitle = toolTitle
     }
@@ -143,7 +143,7 @@ public final class LiveActivityManager {
 
     /// Starts a new Dynamic Island Live Activity or updates the existing one if already active.
     public func start(
-        toolTitle: String = "SmartiumTools",
+        toolTitle: String = "Orb",
         initialState: OrbState = .working,
         progress: Double? = nil
     ) async {
@@ -238,7 +238,7 @@ public final class LiveActivityManager {
     #endif
 
     /// Convenience toggle for quick testing in the base UI.
-    public func toggle(toolTitle: String = "SmartiumTools", state: OrbState) async {
+    public func toggle(toolTitle: String = "Orb", state: OrbState) async {
         syncActiveActivity()
         if isRunning {
             await stop()

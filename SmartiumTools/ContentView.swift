@@ -304,7 +304,7 @@ struct ThinkingOrbsView: View {
     Task {
       defer { isChangingLiveActivity = false }
       await liveActivityManager.toggle(
-        toolTitle: "SmartiumTools",
+        toolTitle: "Orb",
         state: currentState
       )
       liveActivityError = liveActivityManager.lastErrorMessage
