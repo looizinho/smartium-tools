@@ -49,6 +49,8 @@ struct ContentView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.scenePhase) private var scenePhase
   @State private var selectedTab: ToolTab = .orb
+  /// When the last `smartium://tool/<id>` link arrived (v0.13 §5).
+  @State private var deepLinkedAt: Date?
 #if !os(macOS)
   /// Tabs whose screen exists; filled on first visit (v0.9.2).
   @State private var loadedTabs: Set<ToolTab> = []
@@ -84,10 +86,13 @@ struct ContentView: View {
       }
       // v0.8: Live Activities, widgets and the Mac timer open their own tab
       // (`smartium://tool/<id>`). An unknown id keeps the current tab.
+      // v0.13 §5: the link wins over a pending tool, which is dropped so a
+      // stale one can't switch the tab back on the next activation.
       .onOpenURL { url in
         guard let destination = StToolDestination(url: url),
-              let tab = ToolTab(rawValue: destination.rawValue),
-              tab != selectedTab else { return }
+              let tab = ToolTab(rawValue: destination.rawValue) else { return }
+        _ = StLiveSurfaces.takePendingTool()
+        deepLinkedAt = .now
         selectedTab = tab
       }
 #if os(macOS)
@@ -96,10 +101,12 @@ struct ContentView: View {
 #endif
   }
 
-  /// Switches to the tab a control or widget asked for (v0.5).
+  /// Switches to the tab a control or widget asked for (v0.5). Right after
+  /// a deep link, the link's tab stays (v0.13 §5).
   private func openPendingTool() {
     guard let destination = StLiveSurfaces.takePendingTool(),
           let tab = ToolTab(rawValue: destination.rawValue) else { return }
+    if let deepLinkedAt, Date.now.timeIntervalSince(deepLinkedAt) < 2 { return }
     selectedTab = tab
   }
 

@@ -35,6 +35,12 @@ struct WatchRootView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { store.sayHello() }
         }
+        // v0.13 §5: a complication opens its own page, over the last one seen.
+        .onOpenURL { url in
+            guard let tool = StToolDestination(url: url),
+                  store.state.order.contains(tool) else { return }
+            page = tool.rawValue
+        }
     }
 
     /// Only a new focus moves the page; a state without one leaves it alone.
