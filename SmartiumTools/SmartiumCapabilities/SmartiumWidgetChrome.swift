@@ -41,8 +41,10 @@ nonisolated struct StWidgetTheme: Sendable {
     func button(_ tone: Color) -> Color { tone.opacity(isDark ? 0.85 : 0.90) }
 }
 
-/// Black at 92% (dark) or #FAF7FF (light), with the tool's radial glow from
-/// the top trailing corner at 28% / 16%.
+/// v0.13 §6.2: the system material over the wallpaper instead of the flat
+/// black at 92% / #FAF7FF, with the tool's radial glow from the top
+/// trailing corner, much fainter: 12% (dark) / 8% (light). Text, track and
+/// plate keep `StWidgetTheme`, so contrast stays known.
 struct StWidgetBackground: View {
     let tone: Color
     @Environment(\.colorScheme) private var colorScheme
@@ -50,13 +52,9 @@ struct StWidgetBackground: View {
     var body: some View {
         let isDark = colorScheme == .dark
         ZStack {
-            if isDark {
-                Color.black.opacity(0.92)
-            } else {
-                StWidgetTheme.paper
-            }
+            Rectangle().fill(.thinMaterial)
             RadialGradient(
-                colors: [tone.opacity(isDark ? 0.28 : 0.16), Color.clear],
+                colors: [tone.opacity(isDark ? 0.12 : 0.08), Color.clear],
                 center: .topTrailing,
                 startRadius: 8,
                 endRadius: 160
@@ -152,6 +150,8 @@ struct StWidgetCapsule: View {
 /// the middle, a 12 pt label at the foot.
 struct StWidgetSmallLayout<Element: View, Corner: View>: View {
     let label: Text
+    /// Tried in order instead of `label` when it doesn't fit (v0.13 §7).
+    var compactLabels: [Text] = []
     @ViewBuilder let corner: () -> Corner
     @ViewBuilder let element: () -> Element
     @Environment(\.colorScheme) private var colorScheme
@@ -170,13 +170,22 @@ struct StWidgetSmallLayout<Element: View, Corner: View>: View {
             element()
                 .frame(width: 74, height: 74)
 
-            label
-                .font(StFont.body(12, .semibold))
-                .foregroundStyle(theme.primary)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            ViewThatFits(in: .horizontal) {
+                styled(label, theme)
+                ForEach(compactLabels.indices, id: \.self) { index in
+                    styled(compactLabels[index], theme)
+                }
+            }
         }
+    }
+
+    private func styled(_ text: Text, _ theme: StWidgetTheme) -> some View {
+        text
+            .font(StFont.body(12, .semibold))
+            .foregroundStyle(theme.primary)
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
     }
 }
 

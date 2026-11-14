@@ -44,7 +44,12 @@ nonisolated struct StTimerSnapshot: Codable, Sendable, Equatable {
         }
     }
 
-    /// `mm:ss`, or `h:mm:ss` from one hour.
+    /// The one formatter for the timer's remaining time (v0.13 §3): every
+    /// surface (iPhone, Mac and watch apps, widgets, complications, Live
+    /// Activity) calls it, so a paused timer reads the same everywhere.
+    /// Rounded **up**, like the system Timer: 3:59.4 left shows 4:00, and a
+    /// 4 min timer never starts at 3:59. `m:ss` without a leading zero
+    /// (`4:00`, `59:59`), `h:mm:ss` from one hour.
     static func format(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.rounded(.up)))
         let hours = total / 3_600
@@ -52,7 +57,7 @@ nonisolated struct StTimerSnapshot: Codable, Sendable, Equatable {
         let rest = total % 60
         return hours > 0
             ? String(format: "%d:%02d:%02d", hours, minutes, rest)
-            : String(format: "%02d:%02d", minutes, rest)
+            : String(format: "%d:%02d", minutes, rest)
     }
 }
 

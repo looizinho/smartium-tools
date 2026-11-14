@@ -33,7 +33,7 @@ struct SmartiumTimerLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: AlarmAttributes<SmartiumAlarmMetadata>.self) { context in
             let tool = context.attributes.metadata?.tool ?? .timer
-            // The banner sets its own background tint, from the system theme.
+            // v0.13 §6.3: the system material, in the Lock Screen's dark scheme.
             SmartiumTimerBannerView(state: context.state, tool: tool)
                 .activitySystemActionForegroundColor(tool.tone)
                 // v0.8: always open on the owning tool's tab.
@@ -108,9 +108,9 @@ private struct SmartiumTimerCountdownText: View {
             case .countdown(let countdown):
                 Text(timerInterval: Date.now...max(countdown.fireDate, .now), countsDown: true)
             case .paused(let paused):
-                Text(SmartiumTimerStatus.format(paused.totalCountdownDuration - paused.previouslyElapsedDuration))
+                Text(StTimerSnapshot.format(paused.totalCountdownDuration - paused.previouslyElapsedDuration))
             default:
-                Text("00:00")
+                Text(StTimerSnapshot.format(0))
             }
         }
         .monospacedDigit()
@@ -178,28 +178,20 @@ private nonisolated enum SmartiumTimerStatus {
         default: "Encerrado!"
         }
     }
-
-    static func format(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds.rounded()))
-        let hours = total / 3_600
-        let minutes = (total % 3_600) / 60
-        let remaining = total % 60
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, remaining)
-            : String(format: "%02d:%02d", minutes, remaining)
-    }
 }
 
-/// Lock Screen and banner card. v0.12.2 §3: follows the system theme, like
-/// the widgets (`StWidgetTheme`); the Dynamic Island stays dark. The tool
-/// color doesn't change between themes.
+/// Lock Screen and banner card. v0.13 §6.3 (replaces v0.12.2 §3): the
+/// Lock Screen is a dark context, so text and rings use the dark scheme in
+/// both system themes, over the system's default material
+/// instead of black at 90%. `activityBackgroundTint(nil)` drew opaque black
+/// on the device, so the card uses the handoff's fallback: the tool color
+/// at 18%, translucent over the wallpaper.
 private struct SmartiumTimerBannerView: View {
     let state: AlarmPresentationState
     let tool: StTool
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let theme = StWidgetTheme(colorScheme)
+        let theme = StWidgetTheme(.dark)
         HStack(spacing: 14) {
             SmartiumIslandIcon(tool: tool, size: 44)
 
@@ -225,13 +217,14 @@ private struct SmartiumTimerBannerView: View {
         .padding(14)
         .background(
             RadialGradient(
-                colors: [tool.opacity(theme.isDark ? 0.24 : 0.14), .clear],
+                colors: [tool.opacity(0.24), .clear],
                 center: .topTrailing,
                 startRadius: 8,
                 endRadius: 180
             )
         )
-        .activityBackgroundTint(theme.isDark ? Color.black.opacity(0.9) : StWidgetTheme.paper)
+        .environment(\.colorScheme, .dark)
+        .activityBackgroundTint(tool.opacity(0.18))
     }
 }
 #endif

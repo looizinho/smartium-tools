@@ -281,7 +281,7 @@ final class StMacTimerService: NSObject {
         removeNotification()
         guard let scheduledFireDate = fireDate else { return }
         let title = message.isEmpty ? LimitimerSettings.defaultEndMessage : message
-        let body = "Timer de \(TimerFormat.duration(originalDuration))"
+        let body = "Timer de \(StTimerSnapshot.format(originalDuration))"
         let isSilent = limitimer.ringer == .silent
 
         Task {

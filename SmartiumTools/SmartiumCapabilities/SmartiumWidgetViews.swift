@@ -212,7 +212,6 @@ public struct SmartiumLockScreenBannerView: View {
     public let toolTitle: String
     public let state: SmartiumActivityAttributes.ContentState
     public let isStale: Bool
-    @Environment(\.colorScheme) private var colorScheme
 
     public init(toolTitle: String, state: SmartiumActivityAttributes.ContentState, isStale: Bool = false) {
         self.toolTitle = toolTitle
@@ -223,9 +222,8 @@ public struct SmartiumLockScreenBannerView: View {
     /// Live Activity color comes from the owning tool (v0.2).
     private var tone: Color { state.tool.tone }
 
-    private var isDark: Bool {
-        colorScheme == .dark
-    }
+    /// v0.13 §6.3: the Lock Screen is a dark context in both themes.
+    private var isDark: Bool { true }
 
     private var primaryTextColor: Color {
         isDark ? .white : Color(red: 0.10, green: 0.09, blue: 0.14)
@@ -285,24 +283,20 @@ public struct SmartiumLockScreenBannerView: View {
             .buttonStyle(.plain)
         }
         .padding(14)
+        // v0.13 §6.3: the system material instead of black at 90%, with
+        // the tool's glow; the Lock Screen is dark, so is the text.
         .background {
-            ZStack {
-                if isDark {
-                    Color.black.opacity(0.90)
-                } else {
-                    Color(red: 0.98, green: 0.97, blue: 1.00).opacity(0.94)
-                }
-                RadialGradient(
-                    colors: [
-                        tone.opacity(isDark ? 0.24 : 0.14),
-                        Color.clear
-                    ],
-                    center: .topTrailing,
-                    startRadius: 8,
-                    endRadius: 180
-                )
-            }
+            RadialGradient(
+                colors: [tone.opacity(0.24), Color.clear],
+                center: .topTrailing,
+                startRadius: 8,
+                endRadius: 180
+            )
         }
+        .environment(\.colorScheme, .dark)
+        // nil drew opaque black on the device; a translucent tint of the
+        // tool lets the wallpaper through (v0.13 §6.3 fallback).
+        .activityBackgroundTint(tone.opacity(0.18))
     }
 }
 

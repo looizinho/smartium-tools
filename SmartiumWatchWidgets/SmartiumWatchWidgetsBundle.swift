@@ -10,7 +10,8 @@
 //  reaches them. Before this extension, the Smart Stack only showed the
 //  iPhone's controls, mirrored by the system.
 //
-//  Tapping opens the watch app. The complications don't have buttons: the
+//  Tapping opens the watch app on the complication's page (v0.13 §5,
+//  `smartium://tool/<id>`). The complications don't have buttons: the
 //  watch doesn't send actions to the iPhone yet.
 //
 
@@ -67,6 +68,7 @@ struct SmartiumWatchTimerWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: StLiveSurfaces.timerWidgetKind, provider: SmartiumWatchTimerProvider()) { entry in
             StTimerComplication(snapshot: entry.snapshot, date: entry.date)
+                .widgetURL(StTool.timer.deepLink)
         }
         .configurationDisplayName("Timer")
         .description("Tempo restante do timer.")
@@ -109,6 +111,7 @@ struct SmartiumWatchMonitorWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: StLiveSurfaces.monitorWidgetKind, provider: SmartiumWatchMonitorProvider()) { entry in
             StMonitorComplication(metric: entry.metric, metrics: entry.metrics)
+                .widgetURL(StTool.monitor.deepLink)
         }
         .configurationDisplayName("Monitor")
         .description("A métrica fixada no app.")
@@ -146,6 +149,7 @@ struct SmartiumWatchDevicesWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: StLiveSurfaces.devicesWidgetKind, provider: SmartiumWatchDevicesProvider()) { entry in
             StDevicesComplication(devices: entry.devices)
+                .widgetURL(StTool.monitor.deepLink)
         }
         .configurationDisplayName("Dispositivos")
         .description("Bateria do iPhone, do Apple Watch e do Mac.")
