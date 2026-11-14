@@ -17,6 +17,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "0EC1A0012F00000000000001"
                BuildableName = "SmartiumWatch.app"
+               BlueprintName = "SmartiumWatch"
                ReferencedContainer = "container:SmartiumTools.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -46,6 +47,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "0EC1A0012F00000000000001"
             BuildableName = "SmartiumWatch.app"
+            BlueprintName = "SmartiumWatch"
             ReferencedContainer = "container:SmartiumTools.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -62,6 +64,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "0EC1A0012F00000000000001"
             BuildableName = "SmartiumWatch.app"
+            BlueprintName = "SmartiumWatch"
             ReferencedContainer = "container:SmartiumTools.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
